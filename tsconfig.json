@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "lib": [
+      "ESNext"
+    ],
+    "target": "ESNext",
+    "module": "Preserve",
+    "moduleResolution": "node",
+    "verbatimModuleSyntax": true,
+    "strict": true,
+    "skipLibCheck": true
+  }
+}

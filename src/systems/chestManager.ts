@@ -1,13 +1,13 @@
 /**
  * Chest management system.
- * Handles chest spawning, unlock tracking, and collection.
+ * Handles chest spawning, unlock tracking, and collection to inventory.
+ * Chests are collected (not opened) in the world, then opened via UI.
  */
 
 import { Entity, EntityEvent, ColliderShape, RigidBodyType } from 'hytopia';
 import type { ChestTier, ChestDef } from '../game/chests';
 import { CHESTS, CHEST_CONSTANTS, rollChestTier, canUnlockChest } from '../game/chests';
-import { openChest, applyChestRewards, formatChestResults } from '../game/loot';
-import { loadPlayerData } from './playerManager';
+import { loadPlayerData } from '../game/playerData';
 import * as PlayerManager from './playerManager';
 import type { WorldLoopTimerManager } from './timers';
 
@@ -18,17 +18,25 @@ type Vec3 = { x: number; y: number; z: number };
 /** Runtime state for a spawned chest */
 interface ChestInstance {
   id: string;
-  entity: Entity;
+  entity: Entity | null;
   tier: ChestTier;
   definition: ChestDef;
   position: Vec3;
-  isOpen: boolean;
+  groundY: number;
+  isCollected: boolean;
 }
 
 /** Chest spawn point configuration */
 export interface ChestSpawnPoint {
   id: string;
-  position: Vec3;
+  position: Vec3; // x, z used; y will be found via raycast
+}
+
+/** Collected chest in player inventory */
+export interface CollectedChest {
+  tier: ChestTier;
+  spawnPointId: string;
+  collectedAt: number;
 }
 
 export class ChestManager {
@@ -63,10 +71,33 @@ export class ChestManager {
   }
 
   /**
-   * Get all spawn point IDs and positions (for tree manager integration)
+   * Get all spawn point positions (for tree manager tracking)
    */
   getSpawnPointsForTreeTracking(): Array<{ id: string; position: Vec3 }> {
     return this.spawnPoints.map(p => ({ id: p.id, position: p.position }));
+  }
+
+  /**
+   * Find ground height at a position using raycast
+   */
+  private findGroundY(x: number, z: number): number {
+    const startY = 256;
+    const maxDistance = 512;
+    const origin = { x, y: startY, z };
+    const direction = { x: 0, y: -1, z: 0 };
+
+    const hit = this.world.simulation.raycast(origin, direction, maxDistance);
+
+    if (!hit) {
+      console.warn(`[ChestManager] No ground found at ${x}, ${z}`);
+      return 1;
+    }
+
+    if (hit.hitBlock) {
+      return hit.hitBlock.globalCoordinate.y + 1;
+    }
+
+    return hit.hitPoint.y;
   }
 
   /**
@@ -85,6 +116,9 @@ export class ChestManager {
     const tier = rollChestTier();
     const def = CHESTS[tier];
 
+    // Find ground height
+    const groundY = this.findGroundY(point.position.x, point.position.z);
+
     // Create chest entity
     const entity = new Entity({
       name: `Chest-${point.id}`,
@@ -102,8 +136,9 @@ export class ChestManager {
       entity,
       tier,
       definition: def,
-      position: point.position,
-      isOpen: false,
+      position: { x: point.position.x, y: groundY, z: point.position.z },
+      groundY,
+      isCollected: false,
     };
 
     // Store reference
@@ -111,12 +146,12 @@ export class ChestManager {
     (entity as any).__chestId = point.id;
 
     // Set up interaction handler
-    entity.on(EntityEvent.INTERACT, ({ entity: e, player }) => {
+    entity.on(EntityEvent.INTERACT, ({ player }: any) => {
       this.handleChestInteraction(point.id, player);
     });
 
-    // Spawn the entity
-    entity.spawn(this.world, point.position);
+    // Spawn on the ground
+    entity.spawn(this.world, { x: point.position.x, y: groundY, z: point.position.z });
   }
 
   /**
@@ -124,7 +159,7 @@ export class ChestManager {
    */
   private handleChestInteraction(chestId: string, player: Player): void {
     const chest = this.chests.get(chestId);
-    if (!chest || chest.isOpen) return;
+    if (!chest || chest.isCollected) return;
 
     const playerData = loadPlayerData(player);
     const nearbyTrees = this.getPlayerTreeChops(player, chestId);
@@ -140,7 +175,7 @@ export class ChestManager {
       // Send feedback to player
       this.world.chatManager.sendPlayerMessage(
         player,
-        `Cannot open ${chest.definition.name}: ${reason}`,
+        `Cannot collect ${chest.definition.name}: ${reason}`,
         'FF6B6B'
       );
       return;
@@ -157,54 +192,38 @@ export class ChestManager {
       return;
     }
 
-    // Open the chest
-    this.openChest(chest, player);
+    // Collect the chest (don't open yet)
+    this.collectChest(chest, player);
   }
 
   /**
-   * Open a chest and give rewards to player
+   * Collect a chest to player's inventory (not opened yet)
    */
-  private openChest(chest: ChestInstance, player: Player): void {
-    chest.isOpen = true;
+  private collectChest(chest: ChestInstance, player: Player): void {
+    chest.isCollected = true;
 
-    // Get player data
-    const playerData = loadPlayerData(player);
-
-    // Roll rewards
-    const results = openChest(chest.tier, playerData);
-
-    // Apply rewards
-    applyChestRewards(playerData, results);
-
-    // Save updated data
-    for (const result of results) {
-      if (result.kind === 'axe') {
-        PlayerManager.grantAxe(player, result.axeId);
-      } else {
-        PlayerManager.awardShards(player, result.amount);
-      }
-    }
-    PlayerManager.incrementChestsOpened(player);
-
-    // Track in session
+    // Add to player's session inventory
     const session = PlayerManager.getSession(player);
     if (session) {
       session.collectedChests.push({
         tier: chest.tier,
         spawnPointId: chest.id,
+        collectedAt: Date.now(),
       });
     }
 
     // Send feedback
-    const messages = formatChestResults(results);
-    for (const msg of messages) {
-      this.world.chatManager.sendPlayerMessage(player, msg, '00FF00');
-    }
+    this.world.chatManager.sendPlayerMessage(
+      player,
+      `Collected ${chest.definition.name}! (${session?.collectedChests.length ?? 1}/${CHEST_CONSTANTS.INVENTORY_CAP_PER_RUN})`,
+      '00FF00'
+    );
 
-    // Visual: despawn chest
-    if (chest.entity.isSpawned) {
+    // Despawn chest entity
+    if (chest.entity?.isSpawned) {
       chest.entity.despawn();
     }
+    chest.entity = null;
 
     // Clear tree chop tracking for this spawn point
     this.treeChopsNearSpawnPoint.get(chest.id)?.clear();
@@ -232,17 +251,18 @@ export class ChestManager {
 
   /**
    * Track a tree chop near chest spawn points
-   * Called by the game when a tree is chopped
    */
   trackTreeChop(player: Player, treePosition: Vec3): void {
     const playerId = player.id ?? player.username;
     const radiusSq = CHEST_CONSTANTS.NEARBY_TREES_RADIUS ** 2;
 
     for (const point of this.spawnPoints) {
-      const dx = point.position.x - treePosition.x;
-      const dy = point.position.y - treePosition.y;
-      const dz = point.position.z - treePosition.z;
-      const distSq = dx * dx + dy * dy + dz * dz;
+      const chest = this.chests.get(point.id);
+      if (!chest || chest.isCollected) continue;
+
+      const dx = chest.position.x - treePosition.x;
+      const dz = chest.position.z - treePosition.z;
+      const distSq = dx * dx + dz * dz;
 
       if (distSq <= radiusSq) {
         const playerChops = this.treeChopsNearSpawnPoint.get(point.id);
@@ -281,7 +301,7 @@ export class ChestManager {
    * Get all active chests
    */
   getAllChests(): ChestInstance[] {
-    return Array.from(this.chests.values()).filter(c => !c.isOpen);
+    return Array.from(this.chests.values()).filter(c => !c.isCollected);
   }
 
   /**
@@ -289,7 +309,7 @@ export class ChestManager {
    */
   cleanup(): void {
     for (const chest of this.chests.values()) {
-      if (chest.entity.isSpawned) {
+      if (chest.entity?.isSpawned) {
         chest.entity.despawn();
       }
     }

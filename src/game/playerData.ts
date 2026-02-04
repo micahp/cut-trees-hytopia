@@ -54,15 +54,19 @@ export const DEFAULT_PLAYER_DATA: PlayerData = {
   },
 };
 
+/** Collected chest stored in session inventory */
+export type CollectedChest = {
+  tier: string;
+  spawnPointId: string;
+  collectedAt: number;
+};
+
 /**
  * Per-run session data (not persisted)
  */
 export type PlayerSessionData = {
   /** Chests collected this run (capped at INVENTORY_CAP_PER_RUN) */
-  collectedChests: Array<{
-    tier: string;
-    spawnPointId: string;
-  }>;
+  collectedChests: CollectedChest[];
   
   /** Trees chopped near each chest spawn point this run */
   nearbyTreesChoppedBySpawnPoint: Map<string, number>;

@@ -91,13 +91,11 @@ export class ChestManager {
   }
 
   /**
-   * Find ground height at a position.
-   * For now, uses fixed height since terrain is at y=0.
-   * TODO: Implement proper raycast with block-only filtering
+   * Get ground height from spawn point Y coordinate.
+   * The spawn point Y is pre-calculated from map data in index.ts.
    */
-  private findGroundY(x: number, z: number): number {
-    // The map terrain is at y=0, so spawn on top at y=1
-    return 1;
+  private getGroundY(spawnPointY: number): number {
+    return spawnPointY;
   }
 
   /**
@@ -116,8 +114,8 @@ export class ChestManager {
     const tier = rollChestTier();
     const def = CHESTS[tier];
 
-    // Find ground height
-    const groundY = this.findGroundY(point.position.x, point.position.z);
+    // Use Y from spawn point (pre-calculated from map data)
+    const groundY = this.getGroundY(point.position.y);
 
     // Create chest entity
     const entity = new Entity({

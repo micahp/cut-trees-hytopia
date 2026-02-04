@@ -77,6 +77,7 @@ export function getRandomDebris(): DebrisDef {
 
 /**
  * Tree definitions (v1 tuning)
+ * HP set to 1 for instant chop on any hit
  */
 export const TREES: Record<TreeId, TreeDef> = {
   // Tier 1 - Small trees
@@ -85,7 +86,7 @@ export const TREES: Record<TreeId, TreeDef> = {
     name: "Small Oak Tree",
     tier: 1,
     modelUri: "models/environment/Plains/oak-tree-small.gltf",
-    maxHp: 140,
+    maxHp: 1,
     powerReward: 9,
     respawnSeconds: 30,
   },
@@ -94,7 +95,7 @@ export const TREES: Record<TreeId, TreeDef> = {
     name: "Small Pine Tree",
     tier: 1,
     modelUri: "models/environment/Pine Forest/pine-tree-small.gltf",
-    maxHp: 140,
+    maxHp: 1,
     powerReward: 9,
     respawnSeconds: 30,
   },
@@ -105,7 +106,7 @@ export const TREES: Record<TreeId, TreeDef> = {
     name: "Medium Oak Tree",
     tier: 2,
     modelUri: "models/environment/Plains/oak-tree-medium.gltf",
-    maxHp: 280,
+    maxHp: 1,
     powerReward: 18,
     respawnSeconds: 40,
   },
@@ -114,7 +115,7 @@ export const TREES: Record<TreeId, TreeDef> = {
     name: "Medium Pine Tree",
     tier: 2,
     modelUri: "models/environment/Pine Forest/pine-tree-medium.gltf",
-    maxHp: 280,
+    maxHp: 1,
     powerReward: 18,
     respawnSeconds: 40,
   },
@@ -125,7 +126,7 @@ export const TREES: Record<TreeId, TreeDef> = {
     name: "Large Oak Tree",
     tier: 3,
     modelUri: "models/environment/Plains/oak-tree-big.gltf",
-    maxHp: 560,
+    maxHp: 1,
     powerReward: 36,
     respawnSeconds: 55,
   },
@@ -134,7 +135,7 @@ export const TREES: Record<TreeId, TreeDef> = {
     name: "Large Pine Tree",
     tier: 3,
     modelUri: "models/environment/Pine Forest/pine-tree-big.gltf",
-    maxHp: 560,
+    maxHp: 1,
     powerReward: 36,
     respawnSeconds: 55,
   },
@@ -145,7 +146,7 @@ export const TREES: Record<TreeId, TreeDef> = {
     name: "Palm Tree",
     tier: 4,
     modelUri: "models/environment/Tropical/palm-1.gltf",
-    maxHp: 560,
+    maxHp: 1,
     powerReward: 36,
     respawnSeconds: 55,
   },

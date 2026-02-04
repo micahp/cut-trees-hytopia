@@ -575,13 +575,9 @@
         autoChopBtn.classList.add('active');
         autoChopStatus.textContent = 'ON';
         
-        // Start auto-chopping - simulate left mouse button press/release
+        // Start auto-chopping - send chop requests to server
         autoChopInterval = setInterval(() => {
-          // Simulate a quick click (press and release)
-          hytopia.pressInput('ml', true);
-          setTimeout(() => {
-            hytopia.pressInput('ml', false);
-          }, 50);
+          hytopia.sendData({ type: 'requestChop' });
         }, AUTO_CHOP_RATE_MS);
       } else {
         autoChopBtn.classList.remove('active');
@@ -592,8 +588,6 @@
           clearInterval(autoChopInterval);
           autoChopInterval = null;
         }
-        // Ensure button is released
-        hytopia.pressInput('ml', false);
       }
     }
 

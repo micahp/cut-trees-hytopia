@@ -350,6 +350,13 @@ startServer(world => {
       if (data?.type === 'openChest') {
         handleOpenChest(player, data.index);
       }
+      if (data?.type === 'requestChop') {
+        // Auto-chop: find and damage nearest tree
+        const chopped = choppingSystem.autoChop(player);
+        if (chopped) {
+          sendUIStateUpdate(player);
+        }
+      }
     });
 
     // Send initial state to UI after a short delay (let UI load)

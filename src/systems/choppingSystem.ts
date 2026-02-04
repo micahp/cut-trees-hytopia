@@ -145,4 +145,68 @@ export class ChoppingSystem {
       }
     }
   }
+
+  /**
+   * Auto-chop: find and damage nearest tree to player
+   * Used by UI auto-chop button
+   */
+  autoChop(player: Player): boolean {
+    // Check cooldown
+    if (!PlayerManager.canSwing(player)) {
+      return false;
+    }
+
+    // Get player entity position
+    const playerEntity = this.world.entityManager.getPlayerEntitiesByPlayer(player)[0];
+    if (!playerEntity) {
+      return false;
+    }
+
+    const playerPos = playerEntity.position;
+    if (!playerPos) {
+      return false;
+    }
+
+    // Record the swing and animate axe
+    PlayerManager.recordSwing(player);
+    PlayerManager.animateSwing(player);
+
+    // Get equipped axe
+    const playerData = PlayerManager.loadPlayerData(player);
+    const axe = AXES[playerData.equippedAxe] ?? AXES.wooden;
+
+    // Calculate effective stats with upgrades
+    const damage = getEffectiveDamage(playerData, axe.id, axe.damage);
+    const areaRadius = getEffectiveArea(playerData, axe.id, axe.areaRadius);
+
+    // Find nearest tree within range (use axe area radius + some buffer)
+    const searchRadius = areaRadius + 3;
+    const treesInRange = this.treeManager.getTreesInRadius(playerPos, searchRadius);
+
+    if (treesInRange.length === 0) {
+      return false;
+    }
+
+    // Sort by distance and get the nearest one
+    treesInRange.sort((a, b) => {
+      const distA = (a.position.x - playerPos.x) ** 2 + (a.position.z - playerPos.z) ** 2;
+      const distB = (b.position.x - playerPos.x) ** 2 + (b.position.z - playerPos.z) ** 2;
+      return distA - distB;
+    });
+
+    // Damage the nearest tree
+    const nearestTree = treesInRange[0];
+    const wasChopped = this.treeManager.damageTree(nearestTree.id, damage, player);
+
+    if (wasChopped) {
+      this.chestManager.trackTreeChop(player, nearestTree.position);
+      this.world.chatManager.sendPlayerMessage(
+        player,
+        `+${nearestTree.powerReward} Power`,
+        '7CFC00'
+      );
+    }
+
+    return true;
+  }
 }

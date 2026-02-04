@@ -21,28 +21,28 @@ const equippedAxeEntities = new Map<string, Entity>();
 /** Track if player is currently swinging (to prevent overlapping animations) */
 const isSwinging = new Map<string, boolean>();
 
-/** Base axe rotation (resting position) */
+/** Base axe rotation (resting position - axe held at side) */
 const BASE_ROTATION = {
-  x: 0.5,    // pitch blade downward
-  y: 0.5,    // rotate outward from body
-  z: -0.5,   // roll to make blade face flat/horizontal
-  w: 0.5,    // quaternion w component
+  x: 0.35,   // slight pitch
+  y: 0.35,   // pointing slightly outward
+  z: -0.6,   // blade angled
+  w: 0.6,
 };
 
-/** Swing back rotation (~35 degrees back from rest) */
+/** Swing back rotation (wind up - axe pulled back across body) */
 const SWING_BACK_ROTATION = {
-  x: 0.65,   // more pitched back
-  y: 0.45,
+  x: 0.2,    // less pitch
+  y: 0.7,    // rotated back across body
   z: -0.4,
-  w: 0.45,
+  w: 0.55,
 };
 
-/** Swing forward rotation (~35 degrees forward from rest = 70 degree total swing) */
+/** Swing forward rotation (chop - axe swung across body) */
 const SWING_FORWARD_ROTATION = {
-  x: 0.3,    // pitched forward (chopping motion)
-  y: 0.55,
-  z: -0.55,
-  w: 0.55,
+  x: 0.4,    // more pitch down
+  y: -0.2,   // swung across to opposite side
+  z: -0.6,
+  w: 0.65,
 };
 
 /**
@@ -281,10 +281,10 @@ export function recordSwing(player: Player): void {
 }
 
 /**
- * Animate axe swing (70 degree arc: back then forward)
+ * Animate axe swing (horizontal swing across body)
  * Total duration ~300ms for snappy feel
  */
-export function animateSwing(player: Player): void {
+export function animateSwing(player: Player, world?: World): void {
   const playerId = getPlayerId(player);
   const axeEntity = equippedAxeEntities.get(playerId);
   
@@ -295,6 +295,21 @@ export function animateSwing(player: Player): void {
   isSwinging.set(playerId, true);
   
   const position = { x: 0.1, y: -0.1, z: -0.2 };
+  
+  // Try to trigger player arm animation if world is available
+  if (world) {
+    const playerEntity = world.entityManager.getPlayerEntitiesByPlayer(player)[0];
+    if (playerEntity?.startModelLoopedAnimations) {
+      // Trigger a simple swing animation on the player model
+      playerEntity.startModelLoopedAnimations(['simple_interact']);
+      // Stop after animation completes
+      setTimeout(() => {
+        if (playerEntity?.isSpawned && playerEntity.stopModelAnimations) {
+          playerEntity.stopModelAnimations(['simple_interact']);
+        }
+      }, 300);
+    }
+  }
   
   // Phase 1: Swing back (wind up) - 80ms
   axeEntity.setParent(axeEntity.parent!, 'hand-right-anchor', position, SWING_BACK_ROTATION);
@@ -312,5 +327,5 @@ export function animateSwing(player: Player): void {
       axeEntity.setParent(axeEntity.parent!, 'hand-right-anchor', position, BASE_ROTATION);
     }
     isSwinging.set(playerId, false);
-  }, 200);
+  }, 250);
 }

@@ -76,3 +76,13 @@ export {
   upgradeArea,
   formatChestResults,
 } from "./loot";
+
+// World generation
+export {
+  type AuthoredTreeSpawnPoint,
+  type AuthoredChestSpawnPoint,
+  getSpawnablePositions,
+  generateChestSpawnPoints,
+  generateTreeSpawnPoints,
+  generateWorldSpawnPoints,
+} from "./worldGeneration";

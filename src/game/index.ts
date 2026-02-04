@@ -56,6 +56,7 @@ export {
   ownsAxe,
   getEffectiveDamage,
   getEffectiveArea,
+  loadPlayerData,
 } from "./playerData";
 
 // Loot system

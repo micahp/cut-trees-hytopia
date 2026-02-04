@@ -104,3 +104,26 @@ export function getEffectiveArea(playerData: PlayerData, axeId: AxeId, baseArea:
   const bonus = playerData.axeAreaBonus[axeId] ?? 0;
   return baseArea + bonus;
 }
+
+/**
+ * Load player data from HYTOPIA persisted data
+ * Creates defaults if none exists
+ */
+export function loadPlayerData(player: any): PlayerData {
+  const saved = player.getPersistedData() as PlayerData | undefined;
+  
+  if (!saved) {
+    const defaults = { ...DEFAULT_PLAYER_DATA };
+    player.setPersistedData(defaults);
+    return defaults;
+  }
+  
+  return {
+    ...DEFAULT_PLAYER_DATA,
+    ...saved,
+    ownedAxes: { ...DEFAULT_PLAYER_DATA.ownedAxes, ...saved.ownedAxes },
+    axeDamageBonus: { ...saved.axeDamageBonus },
+    axeAreaBonus: { ...saved.axeAreaBonus },
+    stats: { ...DEFAULT_PLAYER_DATA.stats, ...saved.stats },
+  };
+}

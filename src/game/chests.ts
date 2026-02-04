@@ -62,7 +62,7 @@ export const CHESTS: Record<ChestTier, ChestDef> = {
   common: {
     id: "common",
     name: "Common Chest",
-    modelUri: "models/chests/wooden-lootchest.gltf",
+    modelUri: "models/environment/Dungeon/wooden-loot-chest.gltf",
     dropTable: {
       common: 70,
       rare: 25,
@@ -78,7 +78,7 @@ export const CHESTS: Record<ChestTier, ChestDef> = {
   rare: {
     id: "rare",
     name: "Rare Chest",
-    modelUri: "models/chests/silver-loot-chest.gltf",
+    modelUri: "models/environment/Dungeon/silver-loot-chest.gltf",
     dropTable: {
       common: 20,
       rare: 60,
@@ -94,7 +94,7 @@ export const CHESTS: Record<ChestTier, ChestDef> = {
   epic: {
     id: "epic",
     name: "Epic Chest",
-    modelUri: "models/chests/chest-blocky-wood-double.gltf",
+    modelUri: "models/environment/House/chest-blocky-wood-double.gltf",
     dropTable: {
       common: 5,
       rare: 30,
@@ -110,7 +110,7 @@ export const CHESTS: Record<ChestTier, ChestDef> = {
   mythic: {
     id: "mythic",
     name: "Mythic Chest",
-    modelUri: "models/chests/legendary-loot-chest.gltf",
+    modelUri: "models/environment/Dungeon/legendary-loot-chest.gltf",
     dropTable: {
       common: 1,
       rare: 10,

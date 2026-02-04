@@ -89,7 +89,7 @@ export function clearSession(player: Player): void {
 }
 
 /**
- * Attach axe model to player's hand
+ * Attach axe model to player's hand, held outward
  */
 export function equipAxe(
   player: Player,
@@ -117,12 +117,24 @@ export function equipAxe(
     modelUri: axeDef.modelUri,
     modelScale: 1,
     modelPreferredShape: ColliderShape.NONE, // Child entities don't need collision
-    parent: playerEntity,
-    parentNodeName: 'hand-right-anchor',
   });
   
-  // Spawn with relative position to hand
+  // Spawn first, then attach with rotation
   axeEntity.spawn(world, { x: 0, y: 0, z: 0 });
+  
+  // Attach to right hand with rotation to point outward/forward
+  // Rotate 90 degrees around X axis to point forward like a drill
+  const rotation = {
+    x: 0.707,  // 90 degrees around X
+    y: 0,
+    z: 0,
+    w: 0.707,
+  };
+  
+  // Position offset to hold outward from hand
+  const position = { x: 0, y: 0.1, z: 0.3 };
+  
+  axeEntity.setParent(playerEntity, 'hand-right-anchor', position, rotation);
   
   equippedAxeEntities.set(playerId, axeEntity);
   

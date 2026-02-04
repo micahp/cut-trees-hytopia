@@ -3,7 +3,7 @@
  * Handles tree spawning, HP tracking, damage, debris, and respawning.
  */
 
-import { Entity, ColliderShape, RigidBodyType } from 'hytopia';
+import { Entity, ColliderShape, RigidBodyType, Audio } from 'hytopia';
 import type { TreeId, TreeDef, DebrisDef } from '../game/trees';
 import { TREES, applyWorldMultipliers, getRandomDebris } from '../game/trees';
 import { CHEST_CONSTANTS } from '../game/chests';
@@ -159,6 +159,14 @@ export class TreeManager {
 
     tree.currentHp -= damage;
 
+    // Play hit sound at tree position
+    new Audio({
+      uri: 'audio/sfx/damage/hit-wood.mp3',
+      volume: 0.5,
+      referenceDistance: 6,
+      position: tree.position,
+    }).play(this.world);
+
     // Visual feedback - brief color tint
     tree.entity.setTintColor({ r: 1, g: 0.8, b: 0.8 });
     setTimeout(() => {
@@ -185,6 +193,14 @@ export class TreeManager {
     // Award power to player
     PlayerManager.awardPower(player, tree.powerReward);
     PlayerManager.incrementTreesChopped(player);
+
+    // Play tree fall sound at tree position
+    new Audio({
+      uri: 'audio/sfx/damage/hit-woodbreak.mp3',
+      volume: 0.7,
+      referenceDistance: 8,
+      position: tree.position,
+    }).play(this.world);
 
     // Despawn the tree
     if (tree.entity?.isSpawned) {

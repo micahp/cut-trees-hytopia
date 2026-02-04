@@ -122,17 +122,17 @@ export function equipAxe(
   // Spawn first, then attach with rotation
   axeEntity.spawn(world, { x: 0, y: 0, z: 0 });
   
-  // Attach to right hand with rotation to point outward/forward
-  // Rotate 90 degrees around Y axis to point forward
+  // Attach to right hand with rotation: blade down, outward, flat
+  // Combined rotation: pitch forward (X), slight roll (Z) for flat blade
   const rotation = {
-    x: 0,
-    y: 0.707,  // 90 degrees around Y
-    z: 0,
-    w: 0.707,
+    x: 0.5,    // pitch blade downward
+    y: 0.5,    // rotate outward from body
+    z: -0.5,   // roll to make blade face flat/horizontal
+    w: 0.5,    // quaternion w component
   };
   
-  // Position offset to hold in front of player
-  const position = { x: 0.2, y: 0, z: -0.3 };
+  // Position offset: slightly forward and down from hand
+  const position = { x: 0.1, y: -0.1, z: -0.2 };
   
   axeEntity.setParent(playerEntity, 'hand-right-anchor', position, rotation);
   

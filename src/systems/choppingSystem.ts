@@ -95,7 +95,9 @@ export class ChoppingSystem {
     }
 
     // Find all trees in AoE radius
-    const searchRadius = areaRadius + 1;
+    // Cap wooden axe at 3 to prevent too-long reach on fallback detection
+    const baseSearchRadius = areaRadius + 1;
+    const searchRadius = axe.id === 'wooden' ? Math.min(baseSearchRadius, 3) : baseSearchRadius;
     const treesInRange = this.treeManager.getTreesInRadius(hitPoint, searchRadius);
 
     if (treesInRange.length === 0) {
@@ -186,7 +188,9 @@ export class ChoppingSystem {
     const areaRadius = getEffectiveArea(playerData, axe.id, axe.areaRadius);
 
     // Find nearest tree within range
-    const searchRadius = areaRadius + 1;
+    // Cap wooden axe at 3 to prevent too-long reach
+    const baseSearchRadius = areaRadius + 1;
+    const searchRadius = axe.id === 'wooden' ? Math.min(baseSearchRadius, 3) : baseSearchRadius;
     const treesInRange = this.treeManager.getTreesInRadius(playerPos, searchRadius);
 
     if (treesInRange.length === 0) {

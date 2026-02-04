@@ -296,18 +296,11 @@ export function animateSwing(player: Player, world?: World): void {
   
   const position = { x: 0.1, y: -0.1, z: -0.2 };
   
-  // Try to trigger player arm animation if world is available
+  // Trigger player arm swing animation (oneshot plays once and auto-completes)
   if (world) {
     const playerEntity = world.entityManager.getPlayerEntitiesByPlayer(player)[0];
-    if (playerEntity?.startModelLoopedAnimations) {
-      // Trigger a simple swing animation on the player model
-      playerEntity.startModelLoopedAnimations(['simple_interact']);
-      // Stop after animation completes
-      setTimeout(() => {
-        if (playerEntity?.isSpawned && playerEntity.stopModelAnimations) {
-          playerEntity.stopModelAnimations(['simple_interact']);
-        }
-      }, 300);
+    if (playerEntity?.startModelOneshotAnimations) {
+      playerEntity.startModelOneshotAnimations(['simple-interact']);
     }
   }
   

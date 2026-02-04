@@ -225,6 +225,7 @@ export class TreeManager {
 
   /**
    * Spawn random debris at a chopped tree's position
+   * Debris has no collision so players can walk through chopped areas
    */
   private spawnDebris(tree: TreeInstance): void {
     const debris = getRandomDebris();
@@ -233,10 +234,7 @@ export class TreeManager {
       name: `Debris-${tree.id}`,
       modelUri: debris.modelUri,
       modelScale: 1,
-      modelPreferredShape: ColliderShape.CYLINDER,
-      rigidBodyOptions: {
-        type: RigidBodyType.FIXED,
-      },
+      // No collision - players can walk through debris/stumps
     });
 
     tree.debrisEntity = debrisEntity;

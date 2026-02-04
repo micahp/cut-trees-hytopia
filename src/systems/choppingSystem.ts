@@ -58,9 +58,9 @@ export class ChoppingSystem {
       return;
     }
 
-    // Record the swing and animate axe
+    // Record the swing and animate axe + player arm
     PlayerManager.recordSwing(player);
-    PlayerManager.animateSwing(player);
+    PlayerManager.animateSwing(player, this.world);
 
     // Get equipped axe
     const playerData = PlayerManager.loadPlayerData(player);
@@ -70,15 +70,20 @@ export class ChoppingSystem {
     const damage = getEffectiveDamage(playerData, axe.id, axe.damage);
     const areaRadius = getEffectiveArea(playerData, axe.id, axe.areaRadius);
 
-    // Determine hit point for AoE
+    // Determine hit point for AoE - use player position for more reliable targeting
+    const playerEntity = this.world.entityManager.getPlayerEntitiesByPlayer(player)[0];
     let hitPoint: Vec3;
     
     if (raycastHit?.hitPoint) {
       // Use the actual hit point from raycast
       hitPoint = raycastHit.hitPoint;
+    } else if (playerEntity?.position) {
+      // No raycast hit - use player position (more reliable for tree targeting)
+      const pos = playerEntity.position;
+      hitPoint = { x: pos.x, y: pos.y, z: pos.z };
     } else if (origin && direction) {
-      // No hit - project forward from origin
-      const maxRange = 5; // Max swing range
+      // Fallback: project forward from origin
+      const maxRange = 3;
       hitPoint = {
         x: origin.x + direction.x * maxRange,
         y: origin.y + direction.y * maxRange,
@@ -90,7 +95,8 @@ export class ChoppingSystem {
     }
 
     // Find all trees in AoE radius
-    const treesInRange = this.treeManager.getTreesInRadius(hitPoint, areaRadius);
+    const searchRadius = areaRadius + 1;
+    const treesInRange = this.treeManager.getTreesInRadius(hitPoint, searchRadius);
 
     if (treesInRange.length === 0) {
       // No trees hit - maybe send feedback
@@ -167,9 +173,9 @@ export class ChoppingSystem {
       return false;
     }
 
-    // Record the swing and animate axe
+    // Record the swing and animate axe + player arm
     PlayerManager.recordSwing(player);
-    PlayerManager.animateSwing(player);
+    PlayerManager.animateSwing(player, this.world);
 
     // Get equipped axe
     const playerData = PlayerManager.loadPlayerData(player);
@@ -179,8 +185,8 @@ export class ChoppingSystem {
     const damage = getEffectiveDamage(playerData, axe.id, axe.damage);
     const areaRadius = getEffectiveArea(playerData, axe.id, axe.areaRadius);
 
-    // Find nearest tree within range (use axe area radius + some buffer)
-    const searchRadius = areaRadius + 3;
+    // Find nearest tree within range
+    const searchRadius = areaRadius + 1;
     const treesInRange = this.treeManager.getTreesInRadius(playerPos, searchRadius);
 
     if (treesInRange.length === 0) {

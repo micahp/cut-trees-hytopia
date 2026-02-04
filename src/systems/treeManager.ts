@@ -202,25 +202,87 @@ export class TreeManager {
       position: tree.position,
     }).play(this.world);
 
-    // Despawn the tree
-    if (tree.entity?.isSpawned) {
-      tree.entity.despawn();
-    }
-    tree.entity = null;
-
-    // Spawn debris at the tree's position
-    this.spawnDebris(tree);
-
-    // Notify callback
+    // Notify callback immediately (for chest tracking etc)
     if (this.onTreeChopped) {
       this.onTreeChopped(tree, player);
     }
 
-    // Schedule respawn
+    // Animate tree falling and fading
+    this.animateTreeFall(tree);
+
+    // Schedule respawn (after fall animation completes)
     const respawnMs = tree.definition.respawnSeconds * 1000;
     this.timers.setTimeout(respawnMs, () => {
       this.respawnTree(tree.id);
     });
+  }
+
+  /**
+   * Animate tree falling down then disappear immediately
+   * Fall duration: ~600ms
+   */
+  private animateTreeFall(tree: TreeInstance): void {
+    const entity = tree.entity;
+    if (!entity || !entity.isSpawned) {
+      // No entity to animate, just spawn debris
+      this.spawnDebris(tree);
+      return;
+    }
+
+    // Random fall direction (radians)
+    const fallAngle = Math.random() * Math.PI * 2;
+    const fallX = Math.sin(fallAngle);
+    const fallZ = Math.cos(fallAngle);
+
+    // Animation parameters
+    const fallDurationMs = 600;   // Time to fall over
+    const frameInterval = 50;     // Update every 50ms
+
+    let elapsed = 0;
+
+    const animationLoop = () => {
+      elapsed += frameInterval;
+
+      if (!entity.isSpawned) {
+        // Entity was despawned externally
+        this.spawnDebris(tree);
+        return;
+      }
+
+      // Falling animation (rotate toward ground)
+      const fallProgress = Math.min(1, elapsed / fallDurationMs);
+      // Ease out for natural fall feel
+      const easedProgress = 1 - Math.pow(1 - fallProgress, 2);
+      // Rotate ~85 degrees (1.5 radians)
+      const tiltAngle = easedProgress * 1.5;
+
+      // Convert tilt to quaternion (rotation around horizontal axis perpendicular to fall direction)
+      const halfAngle = tiltAngle / 2;
+      const sinHalf = Math.sin(halfAngle);
+      const cosHalf = Math.cos(halfAngle);
+      
+      entity.setRotation({
+        x: fallZ * sinHalf,  // Rotate around axis perpendicular to fall
+        y: 0,
+        z: -fallX * sinHalf,
+        w: cosHalf,
+      });
+
+      if (elapsed >= fallDurationMs) {
+        // Fall complete - despawn immediately and spawn debris
+        if (entity.isSpawned) {
+          entity.despawn();
+        }
+        tree.entity = null;
+        this.spawnDebris(tree);
+      } else {
+        // Continue animation
+        setTimeout(animationLoop, frameInterval);
+      }
+    };
+
+    // Start animation
+    setTimeout(animationLoop, frameInterval);
   }
 
   /**

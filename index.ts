@@ -105,6 +105,29 @@ startServer(world => {
   // Load our map
   world.loadMap(worldMap);
 
+  // Generate and spawn trees
+  const treeSpawnPoints = generateTreeSpawnPoints();
+  treeManager.addSpawnPoints(treeSpawnPoints);
+  treeManager.spawnAll();
+  console.log(`[CutTrees] Spawned ${treeSpawnPoints.length} trees`);
+
+  // Generate and spawn chests
+  const chestSpawnPoints = generateChestSpawnPoints();
+  chestManager.addSpawnPoints(chestSpawnPoints);
+  chestManager.spawnAll();
+  console.log(`[CutTrees] Spawned ${chestSpawnPoints.length} chests`);
+
+  // Wire up tree chop tracking for chest unlocks
+  treeManager.setOnTreeChopped((tree, player) => {
+    chestManager.trackTreeChop(player, tree.position);
+    sendUIStateUpdate(player);
+  });
+
+  // Wire up chest collection callback for UI updates
+  chestManager.setOnChestCollected((player, chest) => {
+    sendUIStateUpdate(player);
+  });
+
   /**
    * Send UI state update to player
    */

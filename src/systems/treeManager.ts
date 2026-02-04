@@ -83,27 +83,13 @@ export class TreeManager {
   }
 
   /**
-   * Find ground height at a position using raycast
+   * Find ground height at a position.
+   * For now, uses fixed height since terrain is at y=0.
+   * TODO: Implement proper raycast with block-only filtering
    */
   private findGroundY(x: number, z: number): number {
-    const startY = 256;
-    const maxDistance = 512;
-    const origin = { x, y: startY, z };
-    const direction = { x: 0, y: -1, z: 0 };
-
-    const hit = this.world.simulation.raycast(origin, direction, maxDistance);
-
-    if (!hit) {
-      console.warn(`[TreeManager] No ground found at ${x}, ${z}`);
-      return 1; // Fallback
-    }
-
-    // Use block top surface if hit a block
-    if (hit.hitBlock) {
-      return hit.hitBlock.globalCoordinate.y + 1;
-    }
-
-    return hit.hitPoint.y;
+    // The map terrain is at y=0, so spawn on top at y=1
+    return 1;
   }
 
   /**

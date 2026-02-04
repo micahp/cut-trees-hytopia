@@ -1,16 +1,15 @@
 /**
- * Tree definitions with HP, rewards, and respawn timers.
+ * Tree and debris definitions.
  * Based on Cut Trees v1 tuning sheet.
  * 
- * Tiers are based on tree size - larger trees give more power but take longer to chop.
+ * Trees are what players chop. When chopped, they spawn debris (stump/fern/driftwood)
+ * which remains until the tree respawns.
  */
 
-export type TreeTier = 0 | 1 | 2 | 3 | 4;
+export type TreeTier = 1 | 2 | 3 | 4;
 
+/** Actual choppable tree types */
 export type TreeId =
-  | "fern"
-  | "weathered_stump"
-  | "driftwood"
   | "oak_small"
   | "pine_small"
   | "oak_medium"
@@ -18,6 +17,9 @@ export type TreeId =
   | "oak_big"
   | "pine_big"
   | "palm";
+
+/** Debris that appears after chopping */
+export type DebrisId = "fern" | "weathered_stump" | "driftwood";
 
 export type TreeDef = {
   id: TreeId;
@@ -37,46 +39,51 @@ export type TreeDef = {
   respawnSeconds: number;
 };
 
+export type DebrisDef = {
+  id: DebrisId;
+  name: string;
+  modelUri: string;
+};
+
 /**
- * v1 Tree tier table (Forest world baseline)
+ * Debris models - spawned when a tree is chopped
  */
-export const TREES: Record<TreeId, TreeDef> = {
-  // Tier 0 - Tiny filler
+export const DEBRIS: Record<DebrisId, DebrisDef> = {
   fern: {
     id: "fern",
     name: "Fern",
-    tier: 0,
     modelUri: "models/environment/fern.gltf",
-    maxHp: 35,
-    powerReward: 2,
-    respawnSeconds: 20,
   },
-
-  // Tier 1 - Small debris
   weathered_stump: {
     id: "weathered_stump",
-    name: "Weathered Tree Stump",
-    tier: 1,
+    name: "Tree Stump",
     modelUri: "models/environment/weathered-tree-stump.gltf",
-    maxHp: 70,
-    powerReward: 4,
-    respawnSeconds: 25,
   },
   driftwood: {
     id: "driftwood",
     name: "Driftwood",
-    tier: 1,
     modelUri: "models/environment/driftwood.gltf",
-    maxHp: 70,
-    powerReward: 4,
-    respawnSeconds: 25,
   },
+};
 
-  // Tier 2 - Small trees
+/** All debris IDs for random selection */
+export const DEBRIS_IDS: DebrisId[] = ["fern", "weathered_stump", "driftwood"];
+
+/** Get random debris to spawn after chopping */
+export function getRandomDebris(): DebrisDef {
+  const id = DEBRIS_IDS[Math.floor(Math.random() * DEBRIS_IDS.length)];
+  return DEBRIS[id];
+}
+
+/**
+ * Tree definitions (v1 tuning)
+ */
+export const TREES: Record<TreeId, TreeDef> = {
+  // Tier 1 - Small trees
   oak_small: {
     id: "oak_small",
     name: "Small Oak Tree",
-    tier: 2,
+    tier: 1,
     modelUri: "models/environment/oak-tree-small.gltf",
     maxHp: 140,
     powerReward: 9,
@@ -85,18 +92,18 @@ export const TREES: Record<TreeId, TreeDef> = {
   pine_small: {
     id: "pine_small",
     name: "Small Pine Tree",
-    tier: 2,
+    tier: 1,
     modelUri: "models/environment/pine-tree-small.gltf",
     maxHp: 140,
     powerReward: 9,
     respawnSeconds: 30,
   },
 
-  // Tier 3 - Medium trees
+  // Tier 2 - Medium trees
   oak_medium: {
     id: "oak_medium",
     name: "Medium Oak Tree",
-    tier: 3,
+    tier: 2,
     modelUri: "models/environment/oak-tree-medium.gltf",
     maxHp: 280,
     powerReward: 18,
@@ -105,18 +112,18 @@ export const TREES: Record<TreeId, TreeDef> = {
   pine_medium: {
     id: "pine_medium",
     name: "Medium Pine Tree",
-    tier: 3,
+    tier: 2,
     modelUri: "models/environment/pine-tree-medium.gltf",
     maxHp: 280,
     powerReward: 18,
     respawnSeconds: 40,
   },
 
-  // Tier 4 - Large trees
+  // Tier 3 - Large trees
   oak_big: {
     id: "oak_big",
     name: "Large Oak Tree",
-    tier: 4,
+    tier: 3,
     modelUri: "models/environment/oak-tree-big.gltf",
     maxHp: 560,
     powerReward: 36,
@@ -125,12 +132,14 @@ export const TREES: Record<TreeId, TreeDef> = {
   pine_big: {
     id: "pine_big",
     name: "Large Pine Tree",
-    tier: 4,
+    tier: 3,
     modelUri: "models/environment/pine-tree-big.gltf",
     maxHp: 560,
     powerReward: 36,
     respawnSeconds: 55,
   },
+
+  // Tier 4 - Special trees
   palm: {
     id: "palm",
     name: "Palm Tree",
@@ -141,6 +150,9 @@ export const TREES: Record<TreeId, TreeDef> = {
     respawnSeconds: 55,
   },
 };
+
+/** All tree IDs for spawning */
+export const TREE_IDS: TreeId[] = Object.keys(TREES) as TreeId[];
 
 /** Get all trees of a specific tier */
 export function getTreesByTier(tier: TreeTier): TreeDef[] {

@@ -1,4 +1,4 @@
-/**
+  /**
  * Game configuration barrel export.
  * Import everything from here: import { AXES, CHESTS, TREES, ... } from './game';
  */
@@ -24,15 +24,21 @@ export {
   getAxeDPS,
 } from "./axes";
 
-// Trees
+// Trees and debris
 export {
   type TreeId,
   type TreeDef,
   type TreeTier,
+  type DebrisId,
+  type DebrisDef,
   type WorldMultipliers,
   TREES,
+  TREE_IDS,
+  DEBRIS,
+  DEBRIS_IDS,
   WORLD_MULTIPLIERS,
   getTreesByTier,
+  getRandomDebris,
   applyWorldMultipliers,
 } from "./trees";
 

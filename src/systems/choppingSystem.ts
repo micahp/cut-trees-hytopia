@@ -58,8 +58,9 @@ export class ChoppingSystem {
       return;
     }
 
-    // Record the swing
+    // Record the swing and animate axe
     PlayerManager.recordSwing(player);
+    PlayerManager.animateSwing(player);
 
     // Get equipped axe
     const playerData = PlayerManager.loadPlayerData(player);

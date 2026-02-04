@@ -18,6 +18,33 @@ const playerSessions = new Map<string, PlayerSessionData>();
 /** Currently equipped axe entity per player */
 const equippedAxeEntities = new Map<string, Entity>();
 
+/** Track if player is currently swinging (to prevent overlapping animations) */
+const isSwinging = new Map<string, boolean>();
+
+/** Base axe rotation (resting position) */
+const BASE_ROTATION = {
+  x: 0.5,    // pitch blade downward
+  y: 0.5,    // rotate outward from body
+  z: -0.5,   // roll to make blade face flat/horizontal
+  w: 0.5,    // quaternion w component
+};
+
+/** Swing back rotation (~35 degrees back from rest) */
+const SWING_BACK_ROTATION = {
+  x: 0.65,   // more pitched back
+  y: 0.45,
+  z: -0.4,
+  w: 0.45,
+};
+
+/** Swing forward rotation (~35 degrees forward from rest = 70 degree total swing) */
+const SWING_FORWARD_ROTATION = {
+  x: 0.3,    // pitched forward (chopping motion)
+  y: 0.55,
+  z: -0.55,
+  w: 0.55,
+};
+
 /**
  * Get player's unique ID for session tracking
  */
@@ -122,19 +149,10 @@ export function equipAxe(
   // Spawn first, then attach with rotation
   axeEntity.spawn(world, { x: 0, y: 0, z: 0 });
   
-  // Attach to right hand with rotation: blade down, outward, flat
-  // Combined rotation: pitch forward (X), slight roll (Z) for flat blade
-  const rotation = {
-    x: 0.5,    // pitch blade downward
-    y: 0.5,    // rotate outward from body
-    z: -0.5,   // roll to make blade face flat/horizontal
-    w: 0.5,    // quaternion w component
-  };
-  
   // Position offset: slightly forward and down from hand
   const position = { x: 0.1, y: -0.1, z: -0.2 };
   
-  axeEntity.setParent(playerEntity, 'hand-right-anchor', position, rotation);
+  axeEntity.setParent(playerEntity, 'hand-right-anchor', position, BASE_ROTATION);
   
   equippedAxeEntities.set(playerId, axeEntity);
   
@@ -260,4 +278,39 @@ export function recordSwing(player: Player): void {
   if (session) {
     session.lastSwingTime = Date.now();
   }
+}
+
+/**
+ * Animate axe swing (70 degree arc: back then forward)
+ * Total duration ~300ms for snappy feel
+ */
+export function animateSwing(player: Player): void {
+  const playerId = getPlayerId(player);
+  const axeEntity = equippedAxeEntities.get(playerId);
+  
+  if (!axeEntity || !axeEntity.isSpawned) return;
+  
+  // Prevent overlapping animations
+  if (isSwinging.get(playerId)) return;
+  isSwinging.set(playerId, true);
+  
+  const position = { x: 0.1, y: -0.1, z: -0.2 };
+  
+  // Phase 1: Swing back (wind up) - 80ms
+  axeEntity.setParent(axeEntity.parent!, 'hand-right-anchor', position, SWING_BACK_ROTATION);
+  
+  // Phase 2: Swing forward (chop) - 120ms
+  setTimeout(() => {
+    if (axeEntity.isSpawned) {
+      axeEntity.setParent(axeEntity.parent!, 'hand-right-anchor', position, SWING_FORWARD_ROTATION);
+    }
+  }, 80);
+  
+  // Phase 3: Return to rest - 100ms
+  setTimeout(() => {
+    if (axeEntity.isSpawned) {
+      axeEntity.setParent(axeEntity.parent!, 'hand-right-anchor', position, BASE_ROTATION);
+    }
+    isSwinging.set(playerId, false);
+  }, 200);
 }

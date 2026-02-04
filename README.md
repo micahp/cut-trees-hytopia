@@ -1,4 +1,4 @@
-# Cut Trees Clone - HYTOPIA Game
+# Cut Trees - HYTOPIA Game
 
 A tree-chopping progression game built with the HYTOPIA SDK. Players chop trees to gain power, unlock chests, and collect increasingly rare axes.
 

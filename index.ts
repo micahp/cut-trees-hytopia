@@ -1,5 +1,5 @@
 /**
- * Cut Trees Clone - HYTOPIA Game Server
+ * Cut Trees - HYTOPIA Game Server
  * 
  * A tree-chopping progression game with:
  * - Multiple axe tiers (Common → Exotic)
@@ -29,31 +29,36 @@ import {
 import type { TreeSpawnPoint, ChestSpawnPoint } from './src/systems';
 
 // Game config
-import { TREES, AXES, loadPlayerData } from './src/game';
+import { TREES, TREE_IDS, AXES, loadPlayerData } from './src/game';
+import type { TreeId } from './src/game';
 
 /**
  * Generate spawn points for trees (placeholder - replace with map data)
+ * Trees spawn on terrain via raycast, so y is ignored.
  */
 function generateTreeSpawnPoints(): TreeSpawnPoint[] {
   const points: TreeSpawnPoint[] = [];
-  const treeIds = Object.keys(TREES) as Array<keyof typeof TREES>;
   
   // Generate a grid of trees for testing
   let id = 0;
   for (let x = -40; x <= 40; x += 8) {
     for (let z = -40; z <= 40; z += 8) {
-      // Random tree type weighted by tier
+      // Random tree type weighted by tier (small more common)
       const rand = Math.random();
-      let treeId: keyof typeof TREES;
-      if (rand < 0.3) treeId = 'fern';
-      else if (rand < 0.5) treeId = Math.random() < 0.5 ? 'oak_small' : 'pine_small';
-      else if (rand < 0.7) treeId = Math.random() < 0.5 ? 'oak_medium' : 'pine_medium';
-      else if (rand < 0.85) treeId = Math.random() < 0.5 ? 'oak_big' : 'pine_big';
-      else treeId = Math.random() < 0.5 ? 'palm' : 'driftwood';
+      let treeId: TreeId;
+      if (rand < 0.35) {
+        treeId = Math.random() < 0.5 ? 'oak_small' : 'pine_small';
+      } else if (rand < 0.65) {
+        treeId = Math.random() < 0.5 ? 'oak_medium' : 'pine_medium';
+      } else if (rand < 0.9) {
+        treeId = Math.random() < 0.5 ? 'oak_big' : 'pine_big';
+      } else {
+        treeId = 'palm';
+      }
       
       points.push({
         id: `tree-${id++}`,
-        position: { x, y: 1, z },
+        position: { x, y: 0, z }, // y will be found via raycast
         treeId,
       });
     }
@@ -64,6 +69,7 @@ function generateTreeSpawnPoints(): TreeSpawnPoint[] {
 
 /**
  * Generate spawn points for chests (placeholder - replace with map data)
+ * Chests spawn on terrain via raycast, so y is ignored.
  */
 function generateChestSpawnPoints(): ChestSpawnPoint[] {
   const points: ChestSpawnPoint[] = [];
@@ -77,7 +83,7 @@ function generateChestSpawnPoints(): ChestSpawnPoint[] {
       id: `chest-${id++}`,
       position: {
         x: Math.cos(angle) * radius,
-        y: 1,
+        y: 0, // y will be found via raycast
         z: Math.sin(angle) * radius,
       },
     });

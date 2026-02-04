@@ -194,6 +194,9 @@ startServer(world => {
   const treeManager = new TreeManager(world, timers);
   const chestManager = new ChestManager(world, timers);
   const choppingSystem = new ChoppingSystem(world, treeManager, chestManager);
+  
+  // Set up chopping input handlers
+  choppingSystem.initialize();
 
   // Load our map
   world.loadMap(worldMap);

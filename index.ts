@@ -30,161 +30,11 @@ import {
 import type { TreeSpawnPoint, ChestSpawnPoint } from './src/systems';
 
 // Game config
-import { TREES, TREE_IDS, AXES, loadPlayerData, openChest, applyChestRewards } from './src/game';
+import { TREES, TREE_IDS, AXES, loadPlayerData, openChest, applyChestRewards, generateWorldSpawnPoints } from './src/game';
 import type { TreeId, ChestTier } from './src/game';
 
-/**
- * Block type IDs from map.json for biome detection
- */
-const BLOCK_TYPES = {
-  GRASS: 7,           // grass-block
-  GRASS_FLOWER: 9,    // grass-flower-block
-  PINE_GRASS: 6,      // grass-block-pine
-  PINE_FLOWER: 8,     // grass-flower-block-pine
-  SAND: 12,           // sand
-  WATER: 16,          // water (avoid)
-} as const;
-
-type BiomeType = 'plains' | 'pine' | 'sand';
-
-interface SpawnablePosition {
-  x: number;
-  y: number;  // Actual ground Y level
-  z: number;
-  biome: BiomeType;
-}
-
-/**
- * Extract valid spawn positions from the map data.
- * Finds the topmost ground block at each x,z and returns positions with no blocks above.
- */
-function getSpawnablePositions(): SpawnablePosition[] {
-  const blocks = (worldMap as any).blocks as Record<string, number>;
-  
-  // Spawnable ground types
-  const plainsTypes = [BLOCK_TYPES.GRASS, BLOCK_TYPES.GRASS_FLOWER];
-  const pineTypes = [BLOCK_TYPES.PINE_GRASS, BLOCK_TYPES.PINE_FLOWER];
-  const sandTypes = [BLOCK_TYPES.SAND];
-  const allSpawnable = [...plainsTypes, ...pineTypes, ...sandTypes];
-  
-  // First pass: find topmost spawnable block at each x,z
-  const topBlocks = new Map<string, { x: number; y: number; z: number; typeId: number }>();
-  
-  Object.entries(blocks).forEach(([key, typeId]) => {
-    const [x, y, z] = key.split(',').map(Number);
-    
-    // Only spawnable block types
-    if (!allSpawnable.includes(typeId)) return;
-    
-    const xzKey = `${x},${z}`;
-    const existing = topBlocks.get(xzKey);
-    
-    // Keep the highest Y at this x,z
-    if (!existing || y > existing.y) {
-      topBlocks.set(xzKey, { x, y, z, typeId });
-    }
-  });
-  
-  // Second pass: filter out positions with blocks above
-  const positions: SpawnablePosition[] = [];
-  
-  topBlocks.forEach(({ x, y, z, typeId }) => {
-    // Check no blocks above (don't spawn under existing trees/structures)
-    const above1 = blocks[`${x},${y + 1},${z}`];
-    const above2 = blocks[`${x},${y + 2},${z}`];
-    if (above1 || above2) return;
-    
-    // Determine biome
-    let biome: BiomeType = 'plains';
-    if (pineTypes.includes(typeId)) biome = 'pine';
-    else if (sandTypes.includes(typeId)) biome = 'sand';
-    
-    positions.push({ x, y, z, biome });
-  });
-  
-  return positions;
-}
-
-/**
- * Generate spawn points for trees using map data.
- * Biome-appropriate trees with ~4 block spacing.
- */
-function generateTreeSpawnPoints(): TreeSpawnPoint[] {
-  const allPositions = getSpawnablePositions();
-  const points: TreeSpawnPoint[] = [];
-  const usedSpots = new Set<string>();
-  
-  // Shuffle for randomness
-  const shuffled = allPositions.sort(() => Math.random() - 0.5);
-  
-  let id = 0;
-  for (const pos of shuffled) {
-    // Enforce ~4 block spacing
-    const gridKey = `${Math.floor(pos.x / 4)},${Math.floor(pos.z / 4)}`;
-    if (usedSpots.has(gridKey)) continue;
-    usedSpots.add(gridKey);
-    
-    // Choose tree type based on biome and tier weighting
-    const rand = Math.random();
-    let treeId: TreeId;
-    
-    if (pos.biome === 'pine') {
-      // Pine forest: pine trees
-      if (rand < 0.4) treeId = 'pine_small';
-      else if (rand < 0.75) treeId = 'pine_medium';
-      else treeId = 'pine_big';
-    } else if (pos.biome === 'sand') {
-      // Beach/sand: palm trees
-      treeId = 'palm';
-    } else {
-      // Plains: oak trees (small more common)
-      if (rand < 0.4) treeId = 'oak_small';
-      else if (rand < 0.75) treeId = 'oak_medium';
-      else treeId = 'oak_big';
-    }
-    
-    // Y offset varies by tree size
-    let yOffset = 5; // big trees and palm
-    if (treeId.includes('_small')) yOffset = 3;      // small trees: down 2 more
-    else if (treeId.includes('_medium')) yOffset = 4; // medium trees: down 1 more
-    
-    points.push({
-      id: `tree-${id++}`,
-      position: { x: pos.x, y: pos.y + yOffset, z: pos.z },
-      treeId,
-    });
-  }
-  
-  return points;
-}
-
-/**
- * Generate spawn points for chests using map data.
- * ~8 block spacing, scattered across all biomes.
- */
-function generateChestSpawnPoints(): ChestSpawnPoint[] {
-  const allPositions = getSpawnablePositions();
-  const points: ChestSpawnPoint[] = [];
-  const usedSpots = new Set<string>();
-  
-  // Shuffle for randomness
-  const shuffled = allPositions.sort(() => Math.random() - 0.5);
-  
-  let id = 0;
-  for (const pos of shuffled) {
-    // Enforce ~8 block spacing (more sparse than trees)
-    const gridKey = `${Math.floor(pos.x / 8)},${Math.floor(pos.z / 8)}`;
-    if (usedSpots.has(gridKey)) continue;
-    usedSpots.add(gridKey);
-    
-    points.push({
-      id: `chest-${id++}`,
-      position: { x: pos.x, y: pos.y + 2, z: pos.z }, // spawn 2 above ground (floor level)
-    });
-  }
-  
-  return points;
-}
+// World generation is now handled by src/game/worldGeneration.ts
+// with proper tree clustering around chests and outer ring patterns
 
 startServer(world => {
   console.log('[CutTrees] Starting server...');
@@ -201,8 +51,14 @@ startServer(world => {
   // Load our map
   world.loadMap(worldMap);
 
-  // Generate and spawn trees
-  const treeSpawnPoints = generateTreeSpawnPoints();
+  // Generate world spawn points using authored patterns
+  // (outer ring trees, chest-aware clusters, interior groves)
+  const { trees: treeSpawnPoints, chests: chestSpawnPoints } = generateWorldSpawnPoints(
+    worldMap as { blocks: Record<string, number> },
+    40 // Target chest count
+  );
+  
+  // Spawn trees
   treeManager.addSpawnPoints(treeSpawnPoints);
   treeManager.spawnAll();
   console.log(`[CutTrees] Spawned ${treeSpawnPoints.length} trees`);
@@ -213,16 +69,22 @@ startServer(world => {
     console.log(`  ${p.treeId}: (${p.position.x}, ${p.position.y}, ${p.position.z})`);
   });
 
-  // Generate and spawn chests
-  const chestSpawnPoints = generateChestSpawnPoints();
+  // Spawn chests with authored tiers
   chestManager.addSpawnPoints(chestSpawnPoints);
   chestManager.spawnAll();
   console.log(`[CutTrees] Spawned ${chestSpawnPoints.length} chests`);
   
+  // Debug: show chest tier distribution
+  const tierCounts = chestSpawnPoints.reduce((acc, p) => {
+    acc[p.chestType] = (acc[p.chestType] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  console.log(`[CutTrees] Chest tiers: ${JSON.stringify(tierCounts)}`);
+  
   // Debug: show sample chest positions
-  console.log('[CutTrees] Sample chest positions (x, y, z):');
+  console.log('[CutTrees] Sample chest positions (type, x, y, z):');
   chestSpawnPoints.slice(0, 5).forEach(p => {
-    console.log(`  chest: (${p.position.x}, ${p.position.y}, ${p.position.z})`);
+    console.log(`  ${p.chestType}: (${p.position.x}, ${p.position.y}, ${p.position.z})`);
   });
 
   // Wire up tree chop tracking for chest unlocks

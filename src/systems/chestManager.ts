@@ -26,10 +26,16 @@ interface ChestInstance {
   isCollected: boolean;
 }
 
-/** Chest spawn point configuration */
+/** Chest spawn point configuration (authored with fixed tier) */
 export interface ChestSpawnPoint {
   id: string;
-  position: Vec3; // x, z used; y will be found via raycast
+  position: Vec3;
+  /** Fixed chest tier for this spawn point */
+  chestType?: ChestTier;
+  /** Radius for counting nearby trees (uses CHEST_CONSTANTS.NEARBY_TREES_RADIUS if not set) */
+  nearbyRadius?: number;
+  /** Trees required to unlock (uses chest definition if not set) */
+  unlockCostTrees?: number;
 }
 
 /** Collected chest in player inventory */
@@ -108,10 +114,11 @@ export class ChestManager {
   }
 
   /**
-   * Spawn a chest at a spawn point with random tier
+   * Spawn a chest at a spawn point (uses authored tier if set, otherwise random)
    */
   private spawnChest(point: ChestSpawnPoint): void {
-    const tier = rollChestTier();
+    // Use authored tier if provided, otherwise roll randomly
+    const tier = point.chestType ?? rollChestTier();
     const def = CHESTS[tier];
 
     // Use Y from spawn point (pre-calculated from map data)
@@ -162,9 +169,17 @@ export class ChestManager {
     const playerData = loadPlayerData(player);
     const nearbyTrees = this.getPlayerTreeChops(player, chestId);
 
-    // Check if player can unlock
+    // Get spawn point for authored unlock cost (if any)
+    const spawnPoint = this.spawnPoints.find(p => p.id === chestId);
+    const unlockCost = spawnPoint?.unlockCostTrees ?? chest.definition.unlockCost;
+
+    // Check if player can unlock (use authored unlock cost if available)
+    const effectiveDef = {
+      ...chest.definition,
+      unlockCost,
+    };
     const { canUnlock, reason } = canUnlockChest(
-      chest.definition,
+      effectiveDef,
       playerData.power,
       nearbyTrees
     );
@@ -260,11 +275,14 @@ export class ChestManager {
    */
   trackTreeChop(player: Player, treePosition: Vec3): void {
     const playerId = player.id ?? player.username;
-    const radiusSq = CHEST_CONSTANTS.NEARBY_TREES_RADIUS ** 2;
 
     for (const point of this.spawnPoints) {
       const chest = this.chests.get(point.id);
       if (!chest || chest.isCollected) continue;
+
+      // Use authored radius if available, otherwise default
+      const radius = point.nearbyRadius ?? CHEST_CONSTANTS.NEARBY_TREES_RADIUS;
+      const radiusSq = radius * radius;
 
       const dx = chest.position.x - treePosition.x;
       const dz = chest.position.z - treePosition.z;

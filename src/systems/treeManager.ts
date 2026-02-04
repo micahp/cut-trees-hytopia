@@ -159,10 +159,10 @@ export class TreeManager {
 
     tree.currentHp -= damage;
 
-    // Play hit sound at tree position
+    // Play hit sound at tree position (quieter)
     new Audio({
       uri: 'audio/sfx/damage/hit-wood.mp3',
-      volume: 0.5,
+      volume: 0.25,
       referenceDistance: 6,
       position: tree.position,
     }).play(this.world);
@@ -194,10 +194,10 @@ export class TreeManager {
     PlayerManager.awardPower(player, tree.powerReward);
     PlayerManager.incrementTreesChopped(player);
 
-    // Play tree fall sound at tree position
+    // Play tree fall sound at tree position (quieter)
     new Audio({
       uri: 'audio/sfx/damage/hit-woodbreak.mp3',
-      volume: 0.7,
+      volume: 0.35,
       referenceDistance: 8,
       position: tree.position,
     }).play(this.world);

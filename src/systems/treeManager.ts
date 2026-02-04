@@ -1,11 +1,11 @@
 /**
  * Tree management system.
- * Handles tree spawning, HP tracking, damage, and respawning.
+ * Handles tree spawning, HP tracking, damage, debris, and respawning.
  */
 
-import { Entity, EntityEvent, ColliderShape, RigidBodyType } from 'hytopia';
-import type { TreeId, TreeDef } from '../game/trees';
-import { TREES, applyWorldMultipliers } from '../game/trees';
+import { Entity, ColliderShape, RigidBodyType } from 'hytopia';
+import type { TreeId, TreeDef, DebrisDef } from '../game/trees';
+import { TREES, applyWorldMultipliers, getRandomDebris } from '../game/trees';
 import { CHEST_CONSTANTS } from '../game/chests';
 import type { WorldLoopTimerManager } from './timers';
 import * as PlayerManager from './playerManager';
@@ -17,27 +17,28 @@ type Vec3 = { x: number; y: number; z: number };
 /** Runtime state for a spawned tree */
 interface TreeInstance {
   id: string;
-  entity: Entity;
+  entity: Entity | null;
+  debrisEntity: Entity | null;
   definition: TreeDef;
   currentHp: number;
   maxHp: number;
   powerReward: number;
   position: Vec3;
+  groundY: number;
   isChopped: boolean;
 }
 
 /** Tree spawn point configuration */
 export interface TreeSpawnPoint {
   id: string;
-  position: Vec3;
+  position: Vec3; // x, z used; y will be found via raycast
   treeId: TreeId;
 }
 
 /** Callback when a tree is chopped down */
 export type TreeChoppedCallback = (
   tree: TreeInstance,
-  player: Player,
-  nearbyChestSpawnPoints: string[]
+  player: Player
 ) => void;
 
 export class TreeManager {
@@ -47,9 +48,6 @@ export class TreeManager {
   private spawnPoints: TreeSpawnPoint[] = [];
   private worldType: string = 'forest';
   private onTreeChopped?: TreeChoppedCallback;
-
-  /** Exposed for chest manager to find nearby trees */
-  private chestSpawnPoints: Vec3[] = [];
 
   constructor(world: World, timers: WorldLoopTimerManager) {
     this.world = world;
@@ -61,13 +59,6 @@ export class TreeManager {
    */
   setOnTreeChopped(callback: TreeChoppedCallback): void {
     this.onTreeChopped = callback;
-  }
-
-  /**
-   * Register chest spawn points for nearby-tree tracking
-   */
-  registerChestSpawnPoints(points: Array<{ id: string; position: Vec3 }>): void {
-    this.chestSpawnPoints = points.map(p => p.position);
   }
 
   /**
@@ -92,6 +83,30 @@ export class TreeManager {
   }
 
   /**
+   * Find ground height at a position using raycast
+   */
+  private findGroundY(x: number, z: number): number {
+    const startY = 256;
+    const maxDistance = 512;
+    const origin = { x, y: startY, z };
+    const direction = { x: 0, y: -1, z: 0 };
+
+    const hit = this.world.simulation.raycast(origin, direction, maxDistance);
+
+    if (!hit) {
+      console.warn(`[TreeManager] No ground found at ${x}, ${z}`);
+      return 1; // Fallback
+    }
+
+    // Use block top surface if hit a block
+    if (hit.hitBlock) {
+      return hit.hitBlock.globalCoordinate.y + 1;
+    }
+
+    return hit.hitPoint.y;
+  }
+
+  /**
    * Spawn all trees at their spawn points
    */
   spawnAll(): void {
@@ -109,6 +124,9 @@ export class TreeManager {
       console.error(`[TreeManager] Unknown tree: ${point.treeId}`);
       return;
     }
+
+    // Find ground height
+    const groundY = this.findGroundY(point.position.x, point.position.z);
 
     // Apply world multipliers
     const { maxHp, powerReward } = applyWorldMultipliers(def, this.worldType);
@@ -128,11 +146,13 @@ export class TreeManager {
     const instance: TreeInstance = {
       id: point.id,
       entity,
+      debrisEntity: null,
       definition: def,
       currentHp: maxHp,
       maxHp,
       powerReward,
-      position: point.position,
+      position: { x: point.position.x, y: groundY, z: point.position.z },
+      groundY,
       isChopped: false,
     };
 
@@ -142,8 +162,8 @@ export class TreeManager {
     // Store tree ID in entity for lookup
     (entity as any).__treeId = point.id;
 
-    // Spawn the entity
-    entity.spawn(this.world, point.position);
+    // Spawn the entity on the ground
+    entity.spawn(this.world, { x: point.position.x, y: groundY, z: point.position.z });
   }
 
   /**
@@ -151,14 +171,14 @@ export class TreeManager {
    */
   damageTree(treeId: string, damage: number, player: Player): boolean {
     const tree = this.trees.get(treeId);
-    if (!tree || tree.isChopped) return false;
+    if (!tree || tree.isChopped || !tree.entity) return false;
 
     tree.currentHp -= damage;
 
     // Visual feedback - brief color tint
     tree.entity.setTintColor({ r: 1, g: 0.8, b: 0.8 });
     setTimeout(() => {
-      if (tree.entity.isSpawned) {
+      if (tree.entity?.isSpawned) {
         tree.entity.setTintColor(undefined);
       }
     }, 100);
@@ -182,17 +202,18 @@ export class TreeManager {
     PlayerManager.awardPower(player, tree.powerReward);
     PlayerManager.incrementTreesChopped(player);
 
-    // Find nearby chest spawn points for unlock tracking
-    const nearbyChestIds = this.findNearbyChestSpawnPoints(tree.position);
+    // Despawn the tree
+    if (tree.entity?.isSpawned) {
+      tree.entity.despawn();
+    }
+    tree.entity = null;
+
+    // Spawn debris at the tree's position
+    this.spawnDebris(tree);
 
     // Notify callback
     if (this.onTreeChopped) {
-      this.onTreeChopped(tree, player, nearbyChestIds);
-    }
-
-    // Visual: despawn the tree
-    if (tree.entity.isSpawned) {
-      tree.entity.despawn();
+      this.onTreeChopped(tree, player);
     }
 
     // Schedule respawn
@@ -203,24 +224,41 @@ export class TreeManager {
   }
 
   /**
-   * Find chest spawn points within NEARBY_TREES_RADIUS of a position
+   * Spawn random debris at a chopped tree's position
    */
-  private findNearbyChestSpawnPoints(position: Vec3): string[] {
-    const radius = CHEST_CONSTANTS.NEARBY_TREES_RADIUS;
-    const radiusSq = radius * radius;
-    const nearbyIds: string[] = [];
+  private spawnDebris(tree: TreeInstance): void {
+    const debris = getRandomDebris();
 
-    // This is a simplified version - in production you'd want a spatial index
-    // For now we iterate all chest spawn points
-    // The actual IDs would be passed from chest manager
-    
-    return nearbyIds; // Will be populated by integration with ChestManager
+    const debrisEntity = new Entity({
+      name: `Debris-${tree.id}`,
+      modelUri: debris.modelUri,
+      modelScale: 1,
+      modelPreferredShape: ColliderShape.CYLINDER,
+      rigidBodyOptions: {
+        type: RigidBodyType.FIXED,
+      },
+    });
+
+    tree.debrisEntity = debrisEntity;
+
+    // Spawn at the same position as the tree was
+    debrisEntity.spawn(this.world, tree.position);
   }
 
   /**
    * Respawn a tree after its timer
    */
   private respawnTree(treeId: string): void {
+    const tree = this.trees.get(treeId);
+    if (!tree) return;
+
+    // Remove debris
+    if (tree.debrisEntity?.isSpawned) {
+      tree.debrisEntity.despawn();
+    }
+    tree.debrisEntity = null;
+
+    // Find the spawn point
     const point = this.spawnPoints.find(p => p.id === treeId);
     if (!point) return;
 
@@ -247,7 +285,7 @@ export class TreeManager {
   }
 
   /**
-   * Get all active trees
+   * Get all active trees (not chopped)
    */
   getAllTrees(): TreeInstance[] {
     return Array.from(this.trees.values()).filter(t => !t.isChopped);
@@ -264,9 +302,9 @@ export class TreeManager {
       if (tree.isChopped) continue;
 
       const dx = tree.position.x - center.x;
-      const dy = tree.position.y - center.y;
       const dz = tree.position.z - center.z;
-      const distSq = dx * dx + dy * dy + dz * dz;
+      // Use 2D distance (ignore Y) for AoE
+      const distSq = dx * dx + dz * dz;
 
       if (distSq <= radiusSq) {
         result.push(tree);
@@ -281,8 +319,11 @@ export class TreeManager {
    */
   cleanup(): void {
     for (const tree of this.trees.values()) {
-      if (tree.entity.isSpawned) {
+      if (tree.entity?.isSpawned) {
         tree.entity.despawn();
+      }
+      if (tree.debrisEntity?.isSpawned) {
+        tree.debrisEntity.despawn();
       }
     }
     this.trees.clear();

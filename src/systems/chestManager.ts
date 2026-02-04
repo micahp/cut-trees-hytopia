@@ -39,6 +39,9 @@ export interface CollectedChest {
   collectedAt: number;
 }
 
+/** Callback when chest is collected */
+export type ChestCollectedCallback = (player: Player, chest: CollectedChest) => void;
+
 export class ChestManager {
   private world: World;
   private timers: WorldLoopTimerManager;
@@ -47,10 +50,20 @@ export class ChestManager {
   
   /** Track trees chopped near each spawn point, per player */
   private treeChopsNearSpawnPoint = new Map<string, Map<string, number>>();
+  
+  /** Callback for chest collection events */
+  private onChestCollected?: ChestCollectedCallback;
 
   constructor(world: World, timers: WorldLoopTimerManager) {
     this.world = world;
     this.timers = timers;
+  }
+
+  /**
+   * Set callback for when chests are collected
+   */
+  setOnChestCollected(callback: ChestCollectedCallback): void {
+    this.onChestCollected = callback;
   }
 
   /**
@@ -202,14 +215,17 @@ export class ChestManager {
   private collectChest(chest: ChestInstance, player: Player): void {
     chest.isCollected = true;
 
+    // Create collected chest record
+    const collectedChest: CollectedChest = {
+      tier: chest.tier,
+      spawnPointId: chest.id,
+      collectedAt: Date.now(),
+    };
+
     // Add to player's session inventory
     const session = PlayerManager.getSession(player);
     if (session) {
-      session.collectedChests.push({
-        tier: chest.tier,
-        spawnPointId: chest.id,
-        collectedAt: Date.now(),
-      });
+      session.collectedChests.push(collectedChest);
     }
 
     // Send feedback
@@ -218,6 +234,11 @@ export class ChestManager {
       `Collected ${chest.definition.name}! (${session?.collectedChests.length ?? 1}/${CHEST_CONSTANTS.INVENTORY_CAP_PER_RUN})`,
       '00FF00'
     );
+
+    // Notify callback
+    if (this.onChestCollected) {
+      this.onChestCollected(player, collectedChest);
+    }
 
     // Despawn chest entity
     if (chest.entity?.isSpawned) {

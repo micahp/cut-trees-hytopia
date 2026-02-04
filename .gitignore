@@ -1,7 +1,14 @@
 node_modules/
 .git/
 .cursor
-assets/
 .DS_Store
 dev/
 index.mjs
+
+# Ignore large asset files but keep custom UI
+assets/models/
+assets/audio/
+assets/blocks/
+assets/icons/
+assets/skyboxes/
+assets/map.json

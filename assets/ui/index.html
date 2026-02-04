@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: white;
+      pointer-events: none;
+    }
+
+    /* ========== HUD ========== */
+    .hud {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .hud-stat {
+      background: rgba(0, 0, 0, 0.6);
+      padding: 8px 14px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      backdrop-filter: blur(4px);
+    }
+
+    .hud-stat .label {
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .hud-stat .value {
+      font-weight: bold;
+      color: #ffd700;
+    }
+
+    .hud-stat.power .value { color: #7cfc00; }
+    .hud-stat.shards .value { color: #00bfff; }
+    .hud-stat.axe .value { color: #ff6b6b; }
+
+    /* ========== Inventory Button ========== */
+    .inventory-button {
+      position: fixed;
+      bottom: 100px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.7);
+      border: 2px solid rgba(255, 215, 0, 0.5);
+      border-radius: 12px;
+      padding: 12px 18px;
+      cursor: pointer;
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .inventory-button:hover {
+      background: rgba(0, 0, 0, 0.85);
+      border-color: rgba(255, 215, 0, 0.8);
+      transform: scale(1.05);
+    }
+
+    .inventory-button .count {
+      background: #ffd700;
+      color: #000;
+      font-weight: bold;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 12px;
+    }
+
+    /* ========== Chest Panel ========== */
+    .chest-panel {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: linear-gradient(145deg, rgba(40, 30, 20, 0.95), rgba(30, 20, 15, 0.95));
+      border: 3px solid #8b4513;
+      border-radius: 16px;
+      padding: 24px;
+      min-width: 400px;
+      max-width: 90vw;
+      max-height: 80vh;
+      display: none;
+      flex-direction: column;
+      gap: 16px;
+      pointer-events: auto;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    .chest-panel.visible {
+      display: flex;
+    }
+
+    .chest-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid rgba(139, 69, 19, 0.5);
+      padding-bottom: 12px;
+    }
+
+    .chest-panel-header h2 {
+      font-size: 20px;
+      color: #ffd700;
+    }
+
+    .close-button {
+      background: rgba(255, 100, 100, 0.3);
+      border: none;
+      color: white;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 18px;
+      transition: all 0.2s;
+    }
+
+    .close-button:hover {
+      background: rgba(255, 100, 100, 0.6);
+    }
+
+    .chest-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+      gap: 12px;
+      max-height: 300px;
+      overflow-y: auto;
+      padding: 4px;
+    }
+
+    .chest-slot {
+      background: rgba(0, 0, 0, 0.4);
+      border: 2px solid rgba(139, 69, 19, 0.6);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .chest-slot:hover {
+      border-color: #ffd700;
+      transform: scale(1.05);
+    }
+
+    .chest-slot.common { border-color: #9d9d9d; }
+    .chest-slot.rare { border-color: #4fc3f7; }
+    .chest-slot.epic { border-color: #ba68c8; }
+    .chest-slot.mythic { border-color: #ffd54f; }
+
+    .chest-slot .icon {
+      font-size: 28px;
+    }
+
+    .chest-slot .tier {
+      font-size: 10px;
+      text-transform: uppercase;
+      opacity: 0.8;
+    }
+
+    .empty-message {
+      text-align: center;
+      color: rgba(255, 255, 255, 0.5);
+      padding: 40px;
+      font-style: italic;
+    }
+
+    /* ========== Loot Modal ========== */
+    .loot-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      pointer-events: auto;
+      z-index: 1000;
+    }
+
+    .loot-modal.visible {
+      display: flex;
+    }
+
+    .loot-content {
+      background: linear-gradient(145deg, rgba(50, 40, 30, 0.98), rgba(35, 25, 20, 0.98));
+      border: 3px solid #ffd700;
+      border-radius: 20px;
+      padding: 32px;
+      text-align: center;
+      max-width: 400px;
+      animation: lootPop 0.3s ease-out;
+    }
+
+    @keyframes lootPop {
+      0% { transform: scale(0.8); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .loot-title {
+      font-size: 24px;
+      color: #ffd700;
+      margin-bottom: 20px;
+    }
+
+    .loot-items {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .loot-item {
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .loot-item.axe {
+      border: 2px solid #7cfc00;
+    }
+
+    .loot-item.shards {
+      border: 2px solid #00bfff;
+    }
+
+    .loot-item .icon {
+      font-size: 32px;
+    }
+
+    .loot-item .details {
+      text-align: left;
+    }
+
+    .loot-item .name {
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    .loot-item .desc {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .loot-item.common .name { color: #9d9d9d; }
+    .loot-item.rare .name { color: #4fc3f7; }
+    .loot-item.epic .name { color: #ba68c8; }
+    .loot-item.mythic .name { color: #ffd54f; }
+    .loot-item.exotic .name { color: #ff5252; }
+
+    .loot-close {
+      background: linear-gradient(145deg, #ffd700, #ffaa00);
+      border: none;
+      color: #000;
+      padding: 12px 32px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .loot-close:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 16px rgba(255, 215, 0, 0.4);
+    }
+
+    /* ========== Mobile Controls ========== */
+    .mobile-controls {
+      display: none;
+    }
+
+    body.mobile .mobile-controls {
+      display: flex;
+      gap: 14px;
+      position: fixed;
+      bottom: 40px;
+      right: 40px;
+    }
+
+    .mobile-button {
+      background-color: rgba(0, 0, 0, 0.5);
+      border-radius: 50%;
+      align-items: center;
+      justify-content: center;
+      display: flex;
+      width: 50px;
+      height: 50px;
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      pointer-events: auto !important;
+    }
+    
+    .mobile-button img {
+      width: 22px;
+      height: 22px;
+    }
+
+    .mobile-button.active {
+      transform: scale(0.92);
+      background-color: rgba(0, 0, 0, 0.75);
+    }
+
+    /* ========== Rarity Colors ========== */
+    .rarity-common { color: #9d9d9d; }
+    .rarity-rare { color: #4fc3f7; }
+    .rarity-epic { color: #ba68c8; }
+    .rarity-mythic { color: #ffd54f; }
+    .rarity-exotic { color: #ff5252; }
+  </style>
+</head>
+<body>
+  <!-- HUD -->
+  <div class="hud">
+    <div class="hud-stat power">
+      <span class="label">Power:</span>
+      <span class="value" id="hud-power">0</span>
+    </div>
+    <div class="hud-stat shards">
+      <span class="label">Shards:</span>
+      <span class="value" id="hud-shards">0</span>
+    </div>
+    <div class="hud-stat axe">
+      <span class="label">Axe:</span>
+      <span class="value" id="hud-axe">Wooden</span>
+    </div>
+  </div>
+
+  <!-- Inventory Button -->
+  <div class="inventory-button" id="inventory-btn">
+    <span>📦 Chests</span>
+    <span class="count" id="chest-count">0</span>
+  </div>
+
+  <!-- Chest Panel -->
+  <div class="chest-panel" id="chest-panel">
+    <div class="chest-panel-header">
+      <h2>📦 Collected Chests</h2>
+      <button class="close-button" id="close-panel">×</button>
+    </div>
+    <div class="chest-grid" id="chest-grid">
+      <div class="empty-message">No chests collected yet.<br>Chop trees near chests to unlock them!</div>
+    </div>
+  </div>
+
+  <!-- Loot Modal -->
+  <div class="loot-modal" id="loot-modal">
+    <div class="loot-content">
+      <h2 class="loot-title">🎉 Chest Opened!</h2>
+      <div class="loot-items" id="loot-items"></div>
+      <button class="loot-close" id="loot-close">Awesome!</button>
+    </div>
+  </div>
+
+  <!-- Mobile Controls -->
+  <div class="mobile-controls">
+    <a id="mobile-interact-button" class="mobile-button">
+      <img src="{{CDN_ASSETS_URL}}/icons/target.png" />
+    </a>
+    <a id="mobile-jump-button" class="mobile-button">
+      <img src="{{CDN_ASSETS_URL}}/icons/jump.png" />
+    </a>
+  </div>
+
+  <script>
+    // ========== State ==========
+    let gameState = {
+      power: 0,
+      shards: 0,
+      equippedAxe: 'Wooden Axe',
+      collectedChests: []
+    };
+
+    // ========== DOM Elements ==========
+    const hudPower = document.getElementById('hud-power');
+    const hudShards = document.getElementById('hud-shards');
+    const hudAxe = document.getElementById('hud-axe');
+    const chestCount = document.getElementById('chest-count');
+    const inventoryBtn = document.getElementById('inventory-btn');
+    const chestPanel = document.getElementById('chest-panel');
+    const closePanel = document.getElementById('close-panel');
+    const chestGrid = document.getElementById('chest-grid');
+    const lootModal = document.getElementById('loot-modal');
+    const lootItems = document.getElementById('loot-items');
+    const lootClose = document.getElementById('loot-close');
+
+    // ========== HUD Update ==========
+    function updateHUD() {
+      hudPower.textContent = gameState.power.toLocaleString();
+      hudShards.textContent = gameState.shards.toLocaleString();
+      hudAxe.textContent = gameState.equippedAxe;
+      chestCount.textContent = gameState.collectedChests.length;
+    }
+
+    // ========== Chest Grid ==========
+    const CHEST_ICONS = {
+      common: '📦',
+      rare: '🎁',
+      epic: '💎',
+      mythic: '👑'
+    };
+
+    function renderChestGrid() {
+      if (gameState.collectedChests.length === 0) {
+        chestGrid.innerHTML = '<div class="empty-message">No chests collected yet.<br>Chop trees near chests to unlock them!</div>';
+        return;
+      }
+
+      chestGrid.innerHTML = gameState.collectedChests.map((chest, index) => `
+        <div class="chest-slot ${chest.tier}" data-index="${index}">
+          <span class="icon">${CHEST_ICONS[chest.tier] || '📦'}</span>
+          <span class="tier">${chest.tier}</span>
+        </div>
+      `).join('');
+
+      // Add click handlers
+      chestGrid.querySelectorAll('.chest-slot').forEach(slot => {
+        slot.addEventListener('click', () => {
+          const index = parseInt(slot.dataset.index, 10);
+          openChest(index);
+        });
+      });
+    }
+
+    // ========== Chest Opening ==========
+    function openChest(index) {
+      const chest = gameState.collectedChests[index];
+      if (!chest) return;
+
+      // Send open request to server
+      hytopia.sendData({
+        type: 'openChest',
+        index: index,
+        tier: chest.tier
+      });
+
+      // Close the panel while waiting for results
+      chestPanel.classList.remove('visible');
+    }
+
+    function showLootResults(results) {
+      lootItems.innerHTML = results.map(item => {
+        if (item.kind === 'axe') {
+          return `
+            <div class="loot-item axe ${item.rarity}">
+              <span class="icon">🪓</span>
+              <div class="details">
+                <div class="name">${item.axeName}</div>
+                <div class="desc">NEW ${item.rarity.toUpperCase()} AXE!</div>
+              </div>
+            </div>
+          `;
+        } else {
+          return `
+            <div class="loot-item shards">
+              <span class="icon">💎</span>
+              <div class="details">
+                <div class="name">+${item.amount} Shards</div>
+                <div class="desc">Duplicate ${item.axeName}</div>
+              </div>
+            </div>
+          `;
+        }
+      }).join('');
+
+      lootModal.classList.add('visible');
+    }
+
+    // ========== Panel Toggle ==========
+    inventoryBtn.addEventListener('click', () => {
+      renderChestGrid();
+      chestPanel.classList.toggle('visible');
+    });
+
+    closePanel.addEventListener('click', () => {
+      chestPanel.classList.remove('visible');
+    });
+
+    lootClose.addEventListener('click', () => {
+      lootModal.classList.remove('visible');
+    });
+
+    // Close panel on escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        chestPanel.classList.remove('visible');
+        lootModal.classList.remove('visible');
+      }
+    });
+
+    // ========== Server Communication ==========
+    hytopia.onData(function(data) {
+      console.log('UI received:', data);
+
+      if (data.type === 'stateUpdate') {
+        gameState.power = data.power ?? gameState.power;
+        gameState.shards = data.shards ?? gameState.shards;
+        gameState.equippedAxe = data.equippedAxe ?? gameState.equippedAxe;
+        gameState.collectedChests = data.collectedChests ?? gameState.collectedChests;
+        updateHUD();
+        
+        // Re-render chest grid if panel is open
+        if (chestPanel.classList.contains('visible')) {
+          renderChestGrid();
+        }
+      }
+
+      if (data.type === 'lootResults') {
+        showLootResults(data.results);
+      }
+
+      if (data.type === 'chestCollected') {
+        // Quick feedback for chest collection
+        gameState.collectedChests = data.collectedChests;
+        updateHUD();
+      }
+    });
+
+    // ========== Mobile Controls ==========
+    const mobileInteractButton = document.getElementById('mobile-interact-button');
+    mobileInteractButton.addEventListener('touchstart', e => {
+      e.preventDefault();
+      mobileInteractButton.classList.add('active');
+      hytopia.pressInput('ml', true);
+    });
+    mobileInteractButton.addEventListener('touchend', e => {
+      e.preventDefault();
+      mobileInteractButton.classList.remove('active');
+      hytopia.pressInput('ml', false);
+    });
+
+    const mobileJumpButton = document.getElementById('mobile-jump-button');
+    mobileJumpButton.addEventListener('touchstart', e => {
+      e.preventDefault();
+      mobileJumpButton.classList.add('active');
+      hytopia.pressInput(' ', true);
+    });
+    mobileJumpButton.addEventListener('touchend', e => {
+      e.preventDefault();
+      mobileJumpButton.classList.remove('active');
+      hytopia.pressInput(' ', false);
+    });
+
+    // ========== Init ==========
+    updateHUD();
+  </script>
+</body>
+</html>

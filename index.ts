@@ -14,6 +14,7 @@ import {
   Audio,
   DefaultPlayerEntity,
   PlayerEvent,
+  PlayerUIEvent,
 } from 'hytopia';
 
 import worldMap from './assets/map.json';
@@ -29,8 +30,8 @@ import {
 import type { TreeSpawnPoint, ChestSpawnPoint } from './src/systems';
 
 // Game config
-import { TREES, TREE_IDS, AXES, loadPlayerData } from './src/game';
-import type { TreeId } from './src/game';
+import { TREES, TREE_IDS, AXES, loadPlayerData, openChest, applyChestRewards } from './src/game';
+import type { TreeId, ChestTier } from './src/game';
 
 /**
  * Generate spawn points for trees (placeholder - replace with map data)
@@ -104,31 +105,89 @@ startServer(world => {
   // Load our map
   world.loadMap(worldMap);
 
-  // Set up spawn points
-  const treeSpawnPoints = generateTreeSpawnPoints();
-  const chestSpawnPoints = generateChestSpawnPoints();
+  /**
+   * Send UI state update to player
+   */
+  function sendUIStateUpdate(player: any) {
+    const data = PlayerManager.loadPlayerData(player);
+    const session = PlayerManager.getSession(player);
+    const axe = AXES[data.equippedAxe];
+    
+    player.ui.sendData({
+      type: 'stateUpdate',
+      power: data.power,
+      shards: data.shards,
+      equippedAxe: axe?.name ?? 'Unknown',
+      collectedChests: session?.collectedChests.map(c => ({
+        tier: c.tier,
+        spawnPointId: c.spawnPointId,
+      })) ?? [],
+    });
+  }
 
-  treeManager.addSpawnPoints(treeSpawnPoints);
-  chestManager.addSpawnPoints(chestSpawnPoints);
+  /**
+   * Handle opening a chest from UI
+   */
+  function handleOpenChest(player: any, index: number) {
+    const session = PlayerManager.getSession(player);
+    if (!session || index < 0 || index >= session.collectedChests.length) {
+      return;
+    }
 
-  // Connect tree manager to chest manager for nearby tracking
-  treeManager.registerChestSpawnPoints(chestManager.getSpawnPointsForTreeTracking());
+    // Get the chest from inventory
+    const chest = session.collectedChests[index];
+    const chestTier = chest.tier as ChestTier;
 
-  // Set up tree chopped callback
-  treeManager.setOnTreeChopped((tree, player, nearbyChestIds) => {
-    // Track tree chop for chest unlocking
-    chestManager.trackTreeChop(player, tree.position);
-  });
+    // Remove from inventory
+    session.collectedChests.splice(index, 1);
 
-  // Spawn all trees and chests
-  console.log(`[CutTrees] Spawning ${treeSpawnPoints.length} trees...`);
-  treeManager.spawnAll();
-  
-  console.log(`[CutTrees] Spawning ${chestSpawnPoints.length} chest spawn points...`);
-  chestManager.spawnAll();
+    // Roll loot using the loot system
+    const playerData = PlayerManager.loadPlayerData(player);
+    const results = openChest(chestTier, playerData);
 
-  // Initialize chopping system (sets up interaction handlers)
-  choppingSystem.initialize();
+    // Apply rewards
+    applyChestRewards(playerData, results);
+
+    // Save updated data
+    for (const result of results) {
+      if (result.kind === 'axe') {
+        PlayerManager.grantAxe(player, result.axeId);
+      } else {
+        PlayerManager.awardShards(player, result.amount);
+      }
+    }
+    PlayerManager.incrementChestsOpened(player);
+
+    // Format results for UI
+    const uiResults = results.map(result => {
+      if (result.kind === 'axe') {
+        const axe = AXES[result.axeId];
+        return {
+          kind: 'axe',
+          axeId: result.axeId,
+          axeName: axe.name,
+          rarity: result.rarity,
+        };
+      } else {
+        const axe = AXES[result.sourceAxeId];
+        return {
+          kind: 'shards',
+          amount: result.amount,
+          axeName: axe.name,
+          rarity: result.rarity,
+        };
+      }
+    });
+
+    // Send loot results to UI
+    player.ui.sendData({
+      type: 'lootResults',
+      results: uiResults,
+    });
+
+    // Send updated state
+    sendUIStateUpdate(player);
+  }
 
   /**
    * Handle player joining the game
@@ -155,13 +214,24 @@ startServer(world => {
     // Load game UI
     player.ui.load('ui/index.html');
 
+    // Set up UI event handlers
+    player.ui.on(PlayerUIEvent.DATA, ({ data }: any) => {
+      if (data?.type === 'openChest') {
+        handleOpenChest(player, data.index);
+      }
+    });
+
+    // Send initial state to UI after a short delay (let UI load)
+    setTimeout(() => {
+      sendUIStateUpdate(player);
+    }, 500);
+
     // Welcome messages
     const axe = AXES[playerData.equippedAxe];
     world.chatManager.sendPlayerMessage(player, '🌲 Welcome to Cut Trees!', '00FF00');
     world.chatManager.sendPlayerMessage(player, `Power: ${playerData.power.toLocaleString()} | Shards: ${playerData.shards}`, 'FFD700');
     world.chatManager.sendPlayerMessage(player, `Equipped: ${axe.name} (${axe.rarity})`, '4FC3F7');
-    world.chatManager.sendPlayerMessage(player, 'Left-click to chop trees!', 'FFFFFF');
-    world.chatManager.sendPlayerMessage(player, 'Chop trees near chests to unlock them.', 'FFFFFF');
+    world.chatManager.sendPlayerMessage(player, 'Left-click to chop trees! Click "Chests" to open collected chests.', 'FFFFFF');
   });
 
   /**

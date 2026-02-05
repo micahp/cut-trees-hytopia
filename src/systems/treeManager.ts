@@ -288,6 +288,7 @@ export class TreeManager {
   /**
    * Spawn random debris at a chopped tree's position
    * Debris has no collision so players can walk through chopped areas
+   * Debris fades out over 1 second and disappears
    */
   private spawnDebris(tree: TreeInstance): void {
     const debris = getRandomDebris();
@@ -303,6 +304,45 @@ export class TreeManager {
 
     // Spawn at the same position as the tree was
     debrisEntity.spawn(this.world, tree.position);
+
+    // Animate fade out over 1 second
+    this.animateDebrisFade(debrisEntity);
+  }
+
+  /**
+   * Animate debris fading out over 1 second then despawn
+   */
+  private animateDebrisFade(entity: Entity): void {
+    const fadeDurationMs = 1000;
+    const frameInterval = 50;
+    let elapsed = 0;
+
+    const fadeLoop = () => {
+      elapsed += frameInterval;
+
+      if (!entity.isSpawned) {
+        return; // Entity was despawned externally
+      }
+
+      // Calculate opacity (1.0 -> 0.0 over 1 second)
+      const progress = Math.min(1, elapsed / fadeDurationMs);
+      const opacity = 1 - progress;
+
+      entity.setOpacity(opacity);
+
+      if (elapsed >= fadeDurationMs) {
+        // Fade complete - despawn debris
+        if (entity.isSpawned) {
+          entity.despawn();
+        }
+      } else {
+        // Continue fade animation
+        setTimeout(fadeLoop, frameInterval);
+      }
+    };
+
+    // Start fade animation
+    setTimeout(fadeLoop, frameInterval);
   }
 
   /**

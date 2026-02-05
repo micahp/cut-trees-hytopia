@@ -3,7 +3,7 @@
  * Handles player swings, raycasts, AoE damage to trees.
  */
 
-import { PlayerEvent, Collider, ColliderShape } from 'hytopia';
+import { PlayerEvent, WorldLoopEvent, Collider, ColliderShape } from 'hytopia';
 import { AXES } from '../game/axes';
 import { getEffectiveDamage, getEffectiveArea } from '../game/playerData';
 import * as PlayerManager from './playerManager';
@@ -94,8 +94,7 @@ export class ChoppingSystem {
       return;
     }
 
-    // Find all trees in AoE radius
-    // Cap wooden axe at 3 to prevent too-long reach on fallback detection
+    // Find all trees in AoE radius (cap wooden axe at 3)
     const baseSearchRadius = areaRadius + 1;
     const searchRadius = axe.id === 'wooden' ? Math.min(baseSearchRadius, 3) : baseSearchRadius;
     const treesInRange = this.treeManager.getTreesInRadius(hitPoint, searchRadius);
@@ -156,7 +155,8 @@ export class ChoppingSystem {
 
   /**
    * Auto-chop: find and damage nearest tree to player
-   * Used by UI auto-chop button
+   * Used by UI auto-chop button and movement-triggered chops
+   * @param skipCooldown - if true, bypasses cooldown check (for movement chops)
    */
   autoChop(player: Player): boolean {
     // Check cooldown
@@ -187,8 +187,7 @@ export class ChoppingSystem {
     const damage = getEffectiveDamage(playerData, axe.id, axe.damage);
     const areaRadius = getEffectiveArea(playerData, axe.id, axe.areaRadius);
 
-    // Find nearest tree within range
-    // Cap wooden axe at 3 to prevent too-long reach
+    // Find nearest tree within range (cap wooden axe at 3)
     const baseSearchRadius = areaRadius + 1;
     const searchRadius = axe.id === 'wooden' ? Math.min(baseSearchRadius, 3) : baseSearchRadius;
     const treesInRange = this.treeManager.getTreesInRadius(playerPos, searchRadius);

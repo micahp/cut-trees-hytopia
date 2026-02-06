@@ -51,7 +51,7 @@
     .hud-stat.shards .value { color: #00bfff; }
     .hud-stat.axe .value { color: #ff6b6b; }
 
-    /* ========== Inventory Button ========== */
+    /* ========== Chests Button ========== */
     .inventory-button {
       position: fixed;
       bottom: 100px;
@@ -373,6 +373,184 @@
     .rarity-epic { color: #ba68c8; }
     .rarity-mythic { color: #ffd54f; }
     .rarity-exotic { color: #ff5252; }
+
+    /* ========== Inventory Panel ========== */
+    .inventory-panel {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: linear-gradient(145deg, rgba(25, 30, 45, 0.96), rgba(15, 18, 30, 0.96));
+      border: 3px solid rgba(100, 140, 255, 0.4);
+      border-radius: 16px;
+      padding: 24px;
+      min-width: 520px;
+      max-width: 90vw;
+      max-height: 85vh;
+      display: none;
+      flex-direction: column;
+      gap: 16px;
+      pointer-events: auto;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 60px rgba(80, 120, 255, 0.08);
+      z-index: 500;
+    }
+
+    .inventory-panel.visible {
+      display: flex;
+    }
+
+    .inventory-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid rgba(100, 140, 255, 0.25);
+      padding-bottom: 12px;
+    }
+
+    .inventory-panel-header h2 {
+      font-size: 20px;
+      color: #a0c4ff;
+    }
+
+    .axe-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      overflow-y: auto;
+      padding: 4px;
+    }
+
+    .axe-card {
+      background: rgba(0, 0, 0, 0.35);
+      border: 2px solid rgba(80, 80, 80, 0.4);
+      border-radius: 12px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .axe-card.owned {
+      cursor: pointer;
+    }
+
+    .axe-card.owned:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    }
+
+    .axe-card.locked {
+      opacity: 0.45;
+    }
+
+    .axe-card.equipped {
+      box-shadow: 0 0 16px rgba(124, 252, 0, 0.2);
+    }
+
+    /* Rarity border colors for axe cards */
+    .axe-card.rarity-common { border-color: rgba(157, 157, 157, 0.6); }
+    .axe-card.rarity-rare { border-color: rgba(79, 195, 247, 0.6); }
+    .axe-card.rarity-epic { border-color: rgba(186, 104, 200, 0.6); }
+    .axe-card.rarity-mythic { border-color: rgba(255, 213, 79, 0.6); }
+    .axe-card.rarity-exotic { border-color: rgba(255, 82, 82, 0.6); }
+
+    .axe-card.equipped.rarity-common { border-color: #9d9d9d; }
+    .axe-card.equipped.rarity-rare { border-color: #4fc3f7; }
+    .axe-card.equipped.rarity-epic { border-color: #ba68c8; }
+    .axe-card.equipped.rarity-mythic { border-color: #ffd54f; }
+    .axe-card.equipped.rarity-exotic { border-color: #ff5252; }
+
+    .axe-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .axe-card-name {
+      font-weight: bold;
+      font-size: 15px;
+    }
+
+    .axe-card-rarity {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(0, 0, 0, 0.3);
+    }
+
+    .axe-card-stats {
+      display: flex;
+      gap: 12px;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .axe-card-stats span {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .axe-card-stats .stat-val {
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .axe-card-badge {
+      font-size: 10px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      text-align: center;
+    }
+
+    .axe-card-badge.equipped-badge {
+      background: rgba(124, 252, 0, 0.2);
+      color: #7cfc00;
+      border: 1px solid rgba(124, 252, 0, 0.4);
+    }
+
+    .axe-card-badge.locked-badge {
+      background: rgba(255, 255, 255, 0.05);
+      color: rgba(255, 255, 255, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .axe-card-perk {
+      font-size: 11px;
+      color: #ffd54f;
+      font-style: italic;
+    }
+
+    /* Backpack button */
+    .backpack-button {
+      position: fixed;
+      bottom: 40px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.7);
+      border: 2px solid rgba(100, 140, 255, 0.5);
+      border-radius: 12px;
+      padding: 12px 18px;
+      cursor: pointer;
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .backpack-button:hover {
+      background: rgba(0, 0, 0, 0.85);
+      border-color: rgba(100, 140, 255, 0.8);
+      transform: scale(1.05);
+    }
   </style>
 </head>
 <body>
@@ -392,16 +570,30 @@
     </div>
   </div>
 
+  <!-- Backpack / Inventory Button -->
+  <div class="backpack-button" id="backpack-btn">
+    <span>🎒 Inventory</span>
+  </div>
+
+  <!-- Chests Button -->
+  <div class="inventory-button" id="inventory-btn">
+    <span>📦 Chests</span>
+    <span class="count" id="chest-count">0</span>
+  </div>
+
   <!-- Auto-Chop Button -->
   <div class="auto-chop-button" id="auto-chop-btn">
     <span>🪓 Auto Chop</span>
     <span class="status" id="auto-chop-status">OFF</span>
   </div>
 
-  <!-- Inventory Button -->
-  <div class="inventory-button" id="inventory-btn">
-    <span>📦 Chests</span>
-    <span class="count" id="chest-count">0</span>
+  <!-- Inventory Panel -->
+  <div class="inventory-panel" id="inventory-panel">
+    <div class="inventory-panel-header">
+      <h2>🎒 Inventory</h2>
+      <button class="close-button" id="close-inventory">×</button>
+    </div>
+    <div class="axe-grid" id="axe-grid"></div>
   </div>
 
   <!-- Chest Panel -->
@@ -439,8 +631,11 @@
     let gameState = {
       power: 0,
       shards: 0,
+      equippedAxeId: 'wooden',
       equippedAxe: 'Wooden Axe',
-      collectedChests: []
+      collectedChests: [],
+      ownedAxes: { wooden: 1 },
+      allAxes: []  // filled by server on first stateUpdate
     };
 
     // Auto-chop state
@@ -462,6 +657,10 @@
     const lootClose = document.getElementById('loot-close');
     const autoChopBtn = document.getElementById('auto-chop-btn');
     const autoChopStatus = document.getElementById('auto-chop-status');
+    const backpackBtn = document.getElementById('backpack-btn');
+    const inventoryPanel = document.getElementById('inventory-panel');
+    const closeInventory = document.getElementById('close-inventory');
+    const axeGrid = document.getElementById('axe-grid');
 
     // ========== HUD Update ==========
     function updateHUD() {
@@ -469,6 +668,64 @@
       hudShards.textContent = gameState.shards.toLocaleString();
       hudAxe.textContent = gameState.equippedAxe;
       chestCount.textContent = gameState.collectedChests.length;
+    }
+
+    // ========== Inventory Grid ==========
+    const RARITY_ORDER = ['common', 'rare', 'epic', 'mythic', 'exotic'];
+
+    function renderAxeGrid() {
+      if (!gameState.allAxes || gameState.allAxes.length === 0) {
+        axeGrid.innerHTML = '<div class="empty-message">Loading axes...</div>';
+        return;
+      }
+
+      // Sort axes by rarity order
+      const sorted = [...gameState.allAxes].sort((a, b) => {
+        return RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity);
+      });
+
+      axeGrid.innerHTML = sorted.map(axe => {
+        const owned = (gameState.ownedAxes[axe.id] ?? 0) > 0;
+        const equipped = gameState.equippedAxeId === axe.id;
+        const classes = [
+          'axe-card',
+          `rarity-${axe.rarity}`,
+          owned ? 'owned' : 'locked',
+          equipped ? 'equipped' : ''
+        ].filter(Boolean).join(' ');
+
+        const perkHtml = axe.perk
+          ? `<div class="axe-card-perk">${axe.perk}</div>`
+          : '';
+
+        const badgeHtml = equipped
+          ? '<div class="axe-card-badge equipped-badge">Equipped</div>'
+          : (!owned ? '<div class="axe-card-badge locked-badge">🔒 Locked</div>' : '<div class="axe-card-badge" style="opacity:0.5;font-size:10px;color:rgba(255,255,255,0.5);">Click to equip</div>');
+
+        return `
+          <div class="${classes}" data-axe-id="${axe.id}">
+            <div class="axe-card-top">
+              <span class="axe-card-name rarity-${axe.rarity}">${axe.name}</span>
+              <span class="axe-card-rarity rarity-${axe.rarity}">${axe.rarity}</span>
+            </div>
+            <div class="axe-card-stats">
+              <span>Dmg <span class="stat-val">${axe.damage}</span></span>
+              <span>Spd <span class="stat-val">${axe.cooldown}s</span></span>
+              <span>Area <span class="stat-val">${axe.areaRadius}m</span></span>
+            </div>
+            ${perkHtml}
+            ${badgeHtml}
+          </div>
+        `;
+      }).join('');
+
+      // Add click handlers for owned axes
+      axeGrid.querySelectorAll('.axe-card.owned:not(.equipped)').forEach(card => {
+        card.addEventListener('click', () => {
+          const axeId = card.dataset.axeId;
+          hytopia.sendData({ type: 'equipAxe', axeId: axeId });
+        });
+      });
     }
 
     // ========== Chest Grid ==========
@@ -546,7 +803,20 @@
     }
 
     // ========== Panel Toggle ==========
+    backpackBtn.addEventListener('click', () => {
+      // Close other panels
+      chestPanel.classList.remove('visible');
+      renderAxeGrid();
+      inventoryPanel.classList.toggle('visible');
+    });
+
+    closeInventory.addEventListener('click', () => {
+      inventoryPanel.classList.remove('visible');
+    });
+
     inventoryBtn.addEventListener('click', () => {
+      // Close other panels
+      inventoryPanel.classList.remove('visible');
       renderChestGrid();
       chestPanel.classList.toggle('visible');
     });
@@ -559,10 +829,11 @@
       lootModal.classList.remove('visible');
     });
 
-    // Close panel on escape key
+    // Close panels on escape key
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         chestPanel.classList.remove('visible');
+        inventoryPanel.classList.remove('visible');
         lootModal.classList.remove('visible');
       }
     });
@@ -611,12 +882,18 @@
         gameState.power = data.power ?? gameState.power;
         gameState.shards = data.shards ?? gameState.shards;
         gameState.equippedAxe = data.equippedAxe ?? gameState.equippedAxe;
+        gameState.equippedAxeId = data.equippedAxeId ?? gameState.equippedAxeId;
         gameState.collectedChests = data.collectedChests ?? gameState.collectedChests;
+        gameState.ownedAxes = data.ownedAxes ?? gameState.ownedAxes;
+        if (data.allAxes) gameState.allAxes = data.allAxes;
         updateHUD();
         
-        // Re-render chest grid if panel is open
+        // Re-render panels if open
         if (chestPanel.classList.contains('visible')) {
           renderChestGrid();
+        }
+        if (inventoryPanel.classList.contains('visible')) {
+          renderAxeGrid();
         }
       }
 

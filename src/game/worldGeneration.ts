@@ -285,6 +285,9 @@ export function generateTreeSpawnPoints(
   }
   
   let treeId = 0;
+
+  /** Spawn exclusion: no trees within this radius of player spawn (0, 0) */
+  const SPAWN_EXCLUSION_RADIUS_SQ = 8 * 8; // 8 blocks
   
   /**
    * Try to add a tree at a position
@@ -295,6 +298,9 @@ export function generateTreeSpawnPoints(
     
     const pos = positionMap.get(key);
     if (!pos) return false;
+
+    // Reject trees too close to player spawn (0, 0)
+    if (x * x + z * z <= SPAWN_EXCLUSION_RADIUS_SQ) return false;
     
     usedPositions.add(key);
     

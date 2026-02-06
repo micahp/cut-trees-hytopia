@@ -31,7 +31,23 @@ import type { TreeSpawnPoint, ChestSpawnPoint } from './src/systems';
 
 // Game config
 import { TREES, TREE_IDS, AXES, loadPlayerData, openChest, applyChestRewards, generateWorldSpawnPoints } from './src/game';
-import type { TreeId, ChestTier } from './src/game';
+import type { TreeId, ChestTier, AxeId } from './src/game';
+
+/**
+ * Pre-computed axe definitions for UI (sent once to each client).
+ * Includes all info the inventory panel needs to render.
+ */
+const ALL_AXES_FOR_UI = Object.values(AXES).map(axe => ({
+  id: axe.id,
+  name: axe.name,
+  rarity: axe.rarity,
+  damage: axe.damage,
+  cooldown: axe.cooldown,
+  areaRadius: axe.areaRadius,
+  perk: axe.perks?.extraRollChance
+    ? `${Math.round(axe.perks.extraRollChance * 100)}% chance for bonus chest roll`
+    : null,
+}));
 
 // World generation is now handled by src/game/worldGeneration.ts
 // with proper tree clustering around chests and outer ring patterns
@@ -101,21 +117,30 @@ startServer(world => {
   /**
    * Send UI state update to player
    */
-  function sendUIStateUpdate(player: any) {
+  function sendUIStateUpdate(player: any, includeAxeDefs: boolean = false) {
     const data = PlayerManager.loadPlayerData(player);
     const session = PlayerManager.getSession(player);
     const axe = AXES[data.equippedAxe];
     
-    player.ui.sendData({
+    const payload: Record<string, any> = {
       type: 'stateUpdate',
       power: data.power,
       shards: data.shards,
       equippedAxe: axe?.name ?? 'Unknown',
+      equippedAxeId: data.equippedAxe,
+      ownedAxes: data.ownedAxes,
       collectedChests: session?.collectedChests.map(c => ({
         tier: c.tier,
         spawnPointId: c.spawnPointId,
       })) ?? [],
-    });
+    };
+
+    // Send axe definitions on first update (so UI can render inventory)
+    if (includeAxeDefs) {
+      payload.allAxes = ALL_AXES_FOR_UI;
+    }
+
+    player.ui.sendData(payload);
   }
 
   /**
@@ -183,6 +208,39 @@ startServer(world => {
   }
 
   /**
+   * Handle equipping an axe from the inventory UI
+   */
+  function handleEquipAxe(player: any, axeId: string) {
+    const playerData = PlayerManager.loadPlayerData(player);
+
+    // Validate axe exists
+    if (!AXES[axeId as AxeId]) {
+      world.chatManager.sendPlayerMessage(player, `Unknown axe: ${axeId}`, 'FF6B6B');
+      return;
+    }
+
+    // Validate player owns it
+    if (!playerData.ownedAxes[axeId as AxeId]) {
+      world.chatManager.sendPlayerMessage(player, `You don't own that axe!`, 'FF6B6B');
+      return;
+    }
+
+    // Already equipped?
+    if (playerData.equippedAxe === axeId) {
+      return;
+    }
+
+    // Equip it
+    const playerEntity = world.entityManager.getPlayerEntitiesByPlayer(player)[0];
+    if (playerEntity) {
+      PlayerManager.equipAxe(player, playerEntity, world, axeId as AxeId);
+      const axeDef = AXES[axeId as AxeId];
+      world.chatManager.sendPlayerMessage(player, `Equipped: ${axeDef.name}`, '00FF00');
+      sendUIStateUpdate(player);
+    }
+  }
+
+  /**
    * Handle player joining the game
    */
   world.on(PlayerEvent.JOINED_WORLD, ({ player }) => {
@@ -219,11 +277,15 @@ startServer(world => {
           sendUIStateUpdate(player);
         }
       }
+      if (data?.type === 'equipAxe') {
+        handleEquipAxe(player, data.axeId);
+      }
     });
 
     // Send initial state to UI after a short delay (let UI load)
+    // Include axe definitions on first load so inventory can render
     setTimeout(() => {
-      sendUIStateUpdate(player);
+      sendUIStateUpdate(player, true);
     }, 500);
 
     // Welcome messages

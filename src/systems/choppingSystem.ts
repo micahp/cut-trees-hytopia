@@ -70,33 +70,46 @@ export class ChoppingSystem {
     const damage = getEffectiveDamage(playerData, axe.id, axe.damage);
     const areaRadius = getEffectiveArea(playerData, axe.id, axe.areaRadius);
 
-    // Determine hit point for AoE - use player position for more reliable targeting
-    const playerEntity = this.world.entityManager.getPlayerEntitiesByPlayer(player)[0];
-    let hitPoint: Vec3;
-    
-    if (raycastHit?.hitPoint) {
-      // Use the actual hit point from raycast
-      hitPoint = raycastHit.hitPoint;
-    } else if (playerEntity?.position) {
-      // No raycast hit - use player position (more reliable for tree targeting)
-      const pos = playerEntity.position;
-      hitPoint = { x: pos.x, y: pos.y, z: pos.z };
-    } else if (origin && direction) {
-      // Fallback: project forward from origin
-      const maxRange = 3;
-      hitPoint = {
-        x: origin.x + direction.x * maxRange,
-        y: origin.y + direction.y * maxRange,
-        z: origin.z + direction.z * maxRange,
-      };
-    } else {
-      // No origin/direction - can't determine hit point
-      return;
-    }
-
-    // Find all trees in AoE radius (cap wooden axe at 3)
+    // Max chop distance = axe's search radius (reach matches axe type; prevents infinite raycast hits)
     const baseSearchRadius = areaRadius + 1;
     const searchRadius = axe.id === 'wooden' ? Math.min(baseSearchRadius, 3) : baseSearchRadius;
+    const maxChopDistance = searchRadius;
+
+    // Determine hit point for AoE; always clamp to max chop distance from player
+    const playerEntity = this.world.entityManager.getPlayerEntitiesByPlayer(player)[0];
+    const playerPos = playerEntity?.position
+      ? { x: playerEntity.position.x, y: playerEntity.position.y, z: playerEntity.position.z }
+      : null;
+    if (!playerPos) return;
+
+    let hitPoint: Vec3;
+    if (raycastHit?.hitPoint) {
+      hitPoint = raycastHit.hitPoint;
+    } else if (origin && direction) {
+      hitPoint = {
+        x: origin.x + direction.x * maxChopDistance,
+        y: origin.y + direction.y * maxChopDistance,
+        z: origin.z + direction.z * maxChopDistance,
+      };
+    } else {
+      hitPoint = { ...playerPos };
+    }
+
+    // Clamp hit point to axe's max chop distance
+    const dx = hitPoint.x - playerPos.x;
+    const dy = hitPoint.y - playerPos.y;
+    const dz = hitPoint.z - playerPos.z;
+    const distSq = dx * dx + dy * dy + dz * dz;
+    if (distSq > maxChopDistance * maxChopDistance) {
+      const dist = Math.sqrt(distSq);
+      const scale = maxChopDistance / dist;
+      hitPoint = {
+        x: playerPos.x + dx * scale,
+        y: playerPos.y + dy * scale,
+        z: playerPos.z + dz * scale,
+      };
+    }
+
     const treesInRange = this.treeManager.getTreesInRadius(hitPoint, searchRadius);
 
     if (treesInRange.length === 0) {

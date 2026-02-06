@@ -228,9 +228,9 @@ export class ChestManager {
       session.collectedChests.push(collectedChest);
     }
 
-    // Play collect sound at chest position
+    // Play collect sound at chest position (Hytopia asset: inventory grab)
     new Audio({
-      uri: 'audio/sfx/damage/hit-woodbreak.mp3',
+      uri: 'audio/sfx/ui/inventory-grab-item.mp3',
       volume: 0.4,
       referenceDistance: 10,
       position: chest.position,

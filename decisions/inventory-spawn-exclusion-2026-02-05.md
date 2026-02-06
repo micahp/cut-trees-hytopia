@@ -30,25 +30,23 @@ inventory"
 
 ---
 
-### [Decision 1]: Spawn tree exclusion — 8-block radius around origin
+### [Decision 1]: Spawn tree exclusion — 8-block radius (superseded: now 3 blocks)
 **Timestamp (UTC):** 2026-02-05T11:45:00Z
 **Scope:** `src/game/worldGeneration.ts`
 **Change Summary:** Added a squared-distance check in `tryAddTree()` that rejects any tree
 within 8 blocks (XZ plane) of the player spawn point `(0, 0)`. Uses pre-computed
-`SPAWN_EXCLUSION_RADIUS_SQ = 64` to avoid sqrt per call.
+`SPAWN_EXCLUSION_RADIUS_SQ` to avoid sqrt per call. **Later reduced to 3 blocks** — see
+`decisions/spawn-exclusion-3-blocks-2026-02-06.md`.
 **Rationale:** Players spawn at `(0, 10, 0)` and were immediately colliding with trees.
-An 8-block exclusion gives a comfortable clearing while keeping the tree density high
-everywhere else. The check is O(1) per candidate position.
+An 8-block exclusion gave a comfortable clearing; feedback was that it was too large, so
+exclusion was reduced to 3 blocks so trees start closer.
 **Alternatives Considered:**
 - Post-spawn despawn of nearby trees — Rejected: Would leave visible holes that refill,
   feels buggy.
-- Larger exclusion (16+ blocks) — Rejected: Would carve too big a hole in the forest;
-  8 blocks is ~2 seconds of walking.
+- Larger exclusion (16+ blocks) — Rejected: Would carve too big a hole in the forest.
 - Configurable exclusion via world gen config — Considered but deferred; hardcoded constant
   is fine until we have multiple spawn points.
 **Trade-offs / Risks:**
-- Removes ~50-80 tree positions from the world; negligible impact on total tree count
-  (typically 2000+).
 - If spawn point changes, the exclusion center must be updated manually.
 **Follow-ups / TODOs:**
 - Extract spawn position as a named constant shared between `index.ts` and world gen.

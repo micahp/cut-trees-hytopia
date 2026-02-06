@@ -15,7 +15,8 @@ consistency with the Hytopia ecosystem.
 - Sound volume tuned for proximity; may need adjustment based on playtesting
 **Follow-ups / TODOs:**
 - Consider adding variety by randomly selecting from multiple hit sounds
-- May want to add a "tree falling" animation before despawn
+- ~~May want to add a "tree falling" animation before despawn~~ — Closed: animation was
+  removed for responsiveness; see `decisions/remove-tree-fall-animation-2026-02-06.md`.
 **Source Prompt(s):** "when a tree is chopped it should disappear. we need to have a sound for it. find a
 sound to use in the default assets."
 

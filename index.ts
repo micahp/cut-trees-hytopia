@@ -208,6 +208,19 @@ startServer(world => {
   }
 
   /**
+   * Handle click on a locked axe in inventory — tell player what they need to equip it
+   */
+  function handleLockedAxeClick(player: any, axeId: string) {
+    const axe = AXES[axeId as AxeId];
+    if (!axe) return;
+    world.chatManager.sendPlayerMessage(
+      player,
+      `${axe.name} is locked. Open chests to get axes — then you can equip them here.`,
+      'FFD700'
+    );
+  }
+
+  /**
    * Handle equipping an axe from the inventory UI
    */
   function handleEquipAxe(player: any, axeId: string) {
@@ -279,6 +292,9 @@ startServer(world => {
       }
       if (data?.type === 'equipAxe') {
         handleEquipAxe(player, data.axeId);
+      }
+      if (data?.type === 'lockedAxeClick') {
+        handleLockedAxeClick(player, data.axeId);
       }
     });
 

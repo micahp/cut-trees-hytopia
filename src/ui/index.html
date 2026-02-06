@@ -719,11 +719,18 @@
         `;
       }).join('');
 
-      // Add click handlers for owned axes
+      // Add click handlers for owned axes (equip)
       axeGrid.querySelectorAll('.axe-card.owned:not(.equipped)').forEach(card => {
         card.addEventListener('click', () => {
           const axeId = card.dataset.axeId;
           hytopia.sendData({ type: 'equipAxe', axeId: axeId });
+        });
+      });
+      // Add click handlers for locked axes (show what's needed to equip)
+      axeGrid.querySelectorAll('.axe-card.locked').forEach(card => {
+        card.addEventListener('click', () => {
+          const axeId = card.dataset.axeId;
+          hytopia.sendData({ type: 'lockedAxeClick', axeId: axeId });
         });
       });
     }

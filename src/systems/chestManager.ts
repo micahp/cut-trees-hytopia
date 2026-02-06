@@ -4,7 +4,7 @@
  * Chests are collected (not opened) in the world, then opened via UI.
  */
 
-import { Entity, EntityEvent, ColliderShape, RigidBodyType } from 'hytopia';
+import { Entity, EntityEvent, ColliderShape, RigidBodyType, Audio } from 'hytopia';
 import type { ChestTier, ChestDef } from '../game/chests';
 import { CHESTS, CHEST_CONSTANTS, rollChestTier, canUnlockChest } from '../game/chests';
 import { loadPlayerData } from '../game/playerData';
@@ -227,6 +227,14 @@ export class ChestManager {
     if (session) {
       session.collectedChests.push(collectedChest);
     }
+
+    // Play collect sound at chest position
+    new Audio({
+      uri: 'audio/sfx/damage/hit-woodbreak.mp3',
+      volume: 0.4,
+      referenceDistance: 10,
+      position: chest.position,
+    }).play(this.world);
 
     // Send feedback
     this.world.chatManager.sendPlayerMessage(

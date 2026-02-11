@@ -17,7 +17,7 @@ import {
   PlayerUIEvent,
 } from 'hytopia';
 
-import worldMap from './assets/map.json';
+import worldMap from './assets/arena-map.json';
 
 // Game systems
 import {

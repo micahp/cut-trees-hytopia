@@ -30,7 +30,7 @@ import {
 import type { TreeSpawnPoint, ChestSpawnPoint } from './src/systems';
 
 // Game config
-import { TREES, TREE_IDS, AXES, CHESTS, RARITY_DISPLAY_NAMES, loadPlayerData, openChest, applyChestRewards, generateWorldSpawnPoints } from './src/game';
+import { TREES, TREE_IDS, AXES, CHESTS, RARITY_DISPLAY_NAMES, loadPlayerData, repairPlayerData, openChest, applyChestRewards, generateWorldSpawnPoints } from './src/game';
 import type { TreeId, ChestTier, AxeId } from './src/game';
 
 /**
@@ -280,12 +280,29 @@ startServer(world => {
     // Load/initialize player data
     const playerData = PlayerManager.loadPlayerData(player);
     
-    // Data integrity: ensure equipped axe is in ownedAxes.
-    // Race conditions with async setPersistedData can desync these.
-    if (AXES[playerData.equippedAxe] && !playerData.ownedAxes[playerData.equippedAxe]) {
-      console.warn(`[CutTrees] Integrity fix: ${player.username} has equippedAxe="${playerData.equippedAxe}" but doesn't own it — adding to ownedAxes`);
-      playerData.ownedAxes[playerData.equippedAxe] = 1;
-      PlayerManager.savePlayerData(player, { ownedAxes: playerData.ownedAxes });
+    // Snapshot key fields before repair (persisted/server values)
+    const serverSnapshot = {
+      equippedAxe: playerData.equippedAxe,
+      ownedAxes: { ...playerData.ownedAxes },
+      power: playerData.power,
+      shards: playerData.shards,
+      stats: { ...playerData.stats },
+    };
+    
+    // Repair desynced or invalid data (invalid equipped axe, missing ownership, bad numbers)
+    const repairs = repairPlayerData(playerData);
+    const localSnapshot = {
+      equippedAxe: playerData.equippedAxe,
+      ownedAxes: playerData.ownedAxes,
+      power: playerData.power,
+      shards: playerData.shards,
+      stats: playerData.stats,
+    };
+    console.log(`[CutTrees] ${player.username} — Server (persisted):`, JSON.stringify(serverSnapshot));
+    console.log(`[CutTrees] ${player.username} — Local (after repair):`, JSON.stringify(localSnapshot));
+    if (Object.keys(repairs).length > 0) {
+      console.log(`[CutTrees] Data repair for ${player.username}:`, Object.keys(repairs));
+      PlayerManager.savePlayerData(player, repairs);
     }
     
     // Initialize session

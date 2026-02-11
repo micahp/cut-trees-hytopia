@@ -63,6 +63,7 @@ export {
   getEffectiveDamage,
   getEffectiveArea,
   loadPlayerData,
+  repairPlayerData,
 } from "./playerData";
 
 // Loot system

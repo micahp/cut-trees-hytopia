@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="assets-base" content="{{CDN_ASSETS_URL}}" />
   <style>
     * {
       box-sizing: border-box;
@@ -51,6 +52,13 @@
     .hud-stat.shards .value { color: #00bfff; }
     .hud-stat.axe .value { color: #ff6b6b; }
 
+    .hud-stat .icon-img {
+      width: 24px;
+      height: 24px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+
     /* ========== Chests Button ========== */
     .inventory-button {
       position: fixed;
@@ -74,7 +82,15 @@
       transform: scale(1.05);
     }
 
-    .inventory-button .count {
+    .inventory-button .icon-img,
+.auto-chop-button .icon-img,
+.backpack-button .icon-img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.inventory-button .count {
       background: #ffd700;
       color: #000;
       font-weight: bold;
@@ -156,9 +172,18 @@
       padding-bottom: 12px;
     }
 
-    .chest-panel-header h2 {
+    .chest-panel-header h2,
+    .inventory-panel-header h2 {
       font-size: 20px;
       color: #ffd700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .title-icon {
+      width: 28px;
+      height: 28px;
+      object-fit: contain;
     }
 
     .close-button {
@@ -292,6 +317,11 @@
 
     .loot-item .icon {
       font-size: 32px;
+    }
+    .loot-item .icon img.icon-img {
+      width: 36px;
+      height: 36px;
+      object-fit: contain;
     }
 
     .loot-item .details {
@@ -557,14 +587,17 @@
   <!-- HUD -->
   <div class="hud">
     <div class="hud-stat power">
+      <img class="icon-img" src="{{CDN_ASSETS_URL}}/icons/Main/Lighting/64px/Lighting 1st 64px.png" alt="" />
       <span class="label">Power:</span>
       <span class="value" id="hud-power">0</span>
     </div>
     <div class="hud-stat shards">
+      <img class="icon-img" src="{{CDN_ASSETS_URL}}/icons/currency/Crystal/64w/Crystal Blue 64px.png" alt="" />
       <span class="label">Shards:</span>
       <span class="value" id="hud-shards">0</span>
     </div>
     <div class="hud-stat axe">
+      <img class="icon-img" id="hud-axe-icon" src="{{CDN_ASSETS_URL}}/icons/Item/Axe/64px/Axe 1st 64px.png" alt="" />
       <span class="label">Axe:</span>
       <span class="value" id="hud-axe">Wooden</span>
     </div>
@@ -572,25 +605,28 @@
 
   <!-- Backpack / Inventory Button -->
   <div class="backpack-button" id="backpack-btn">
-    <span>🎒 Inventory</span>
+    <img class="icon-img" src="{{CDN_ASSETS_URL}}/icons/Item/Backpack/64px/Backpack 1st 64px.png" alt="" />
+    <span>Inventory</span>
   </div>
 
   <!-- Chests Button -->
   <div class="inventory-button" id="inventory-btn">
-    <span>📦 Chests</span>
+    <img class="icon-img" src="{{CDN_ASSETS_URL}}/icons/Item/Chest/64px/Chest 1st 64px.png" alt="" />
+    <span>Chests</span>
     <span class="count" id="chest-count">0</span>
   </div>
 
   <!-- Auto-Chop Button -->
   <div class="auto-chop-button" id="auto-chop-btn">
-    <span>🪓 Auto Chop</span>
+    <img class="icon-img" src="{{CDN_ASSETS_URL}}/icons/Item/Axe/64px/Axe 1st 64px.png" alt="" />
+    <span>Auto Chop</span>
     <span class="status" id="auto-chop-status">OFF</span>
   </div>
 
   <!-- Inventory Panel -->
   <div class="inventory-panel" id="inventory-panel">
     <div class="inventory-panel-header">
-      <h2>🎒 Inventory</h2>
+      <h2><img class="icon-img title-icon" src="{{CDN_ASSETS_URL}}/icons/Item/Backpack/64px/Backpack 1st 64px.png" alt="" /> Inventory</h2>
       <button class="close-button" id="close-inventory">×</button>
     </div>
     <div class="axe-grid" id="axe-grid"></div>
@@ -599,7 +635,7 @@
   <!-- Chest Panel -->
   <div class="chest-panel" id="chest-panel">
     <div class="chest-panel-header">
-      <h2>📦 Collected Chests</h2>
+      <h2><img class="icon-img title-icon" src="{{CDN_ASSETS_URL}}/icons/Item/Chest/64px/Chest 1st 64px.png" alt="" /> Collected Chests</h2>
       <button class="close-button" id="close-panel">×</button>
     </div>
     <div class="chest-grid" id="chest-grid">
@@ -627,6 +663,38 @@
   </div>
 
   <script>
+    // ========== Asset base for icon URLs ==========
+    const ASSETS_BASE = document.querySelector('meta[name="assets-base"]')?.getAttribute('content') || '';
+
+    function iconUrl(path) {
+      if (!ASSETS_BASE || !path) return '';
+      const base = ASSETS_BASE.replace(/\/$/, '');
+      const p = path.startsWith('icons/') ? path : 'icons/' + path;
+      return base + '/' + p;
+    }
+
+    // Axe icon paths: game axe id -> path under icons/
+    const AXE_ICON_PATHS = {
+      wooden: 'Item/Axe/64px/Axe 1st 64px.png',
+      stone: 'Item/Axe/64px/Axe 1st 64px.png',
+      iron: 'Item/Axe/64px/Axe 1st 64px.png',
+      golden: 'Item/Axe/64px/Axe 1st 64px.png',
+      diamond: 'Item/Axe/64px/Axe 1st 64px.png',
+      ruby: 'axes/png/ruby.png',
+      sapphire: 'axes/png/sapphire.png',
+      emerald: 'axes/png/emerald.png'
+    };
+
+    // Chest tier icon paths
+    const CHEST_ICON_PATHS = {
+      common: 'Item/Box/64px/Box 1st 64px.png',
+      rare: 'Item/Gift/64px/Red Gift 1st 64px.png',
+      epic: 'Item/Chest/64px/Chest 1st 64px.png',
+      mythic: 'Item/Crown/64px/Crown 1st 64px.png'
+    };
+
+    const SHARDS_ICON_PATH = 'currency/Crystal/64w/Crystal Blue 64px.png';
+
     // ========== State ==========
     let gameState = {
       power: 0,
@@ -663,11 +731,17 @@
     const axeGrid = document.getElementById('axe-grid');
 
     // ========== HUD Update ==========
+    const hudAxeIcon = document.getElementById('hud-axe-icon');
     function updateHUD() {
       hudPower.textContent = gameState.power.toLocaleString();
       hudShards.textContent = gameState.shards.toLocaleString();
       hudAxe.textContent = gameState.equippedAxe;
       chestCount.textContent = gameState.collectedChests.length;
+      const axePath = AXE_ICON_PATHS[gameState.equippedAxeId];
+      if (hudAxeIcon && axePath) {
+        const src = iconUrl(axePath);
+        if (src) hudAxeIcon.src = src;
+      }
     }
 
     // ========== Inventory Grid ==========
@@ -760,6 +834,7 @@
       chestGrid.querySelectorAll('.chest-slot').forEach(slot => {
         slot.addEventListener('click', () => {
           const index = parseInt(slot.dataset.index, 10);
+          if (!Number.isInteger(index) || index < 0 || index >= gameState.collectedChests.length) return;
           openChest(index);
         });
       });
@@ -768,9 +843,8 @@
     // ========== Chest Opening ==========
     function openChest(index) {
       const chest = gameState.collectedChests[index];
-      if (!chest) return;
+      if (!chest || index < 0 || index >= gameState.collectedChests.length) return;
 
-      // Send open request to server
       hytopia.sendData({
         type: 'openChest',
         index: index,
@@ -782,11 +856,18 @@
     }
 
     function showLootResults(results) {
+      if (!Array.isArray(results)) return;
+      const shardsSrc = iconUrl(SHARDS_ICON_PATH);
       lootItems.innerHTML = results.map(item => {
         if (item.kind === 'axe') {
+          const axePath = AXE_ICON_PATHS[item.axeId] || AXE_ICON_PATHS.wooden;
+          const axeSrc = iconUrl(axePath);
+          const iconHtml = axeSrc
+            ? `<span class="icon"><img class="icon-img" src="${axeSrc}" alt="" /></span>`
+            : '<span class="icon">🪓</span>';
           return `
             <div class="loot-item axe ${item.rarity}">
-              <span class="icon">🪓</span>
+              ${iconHtml}
               <div class="details">
                 <div class="name">${item.axeName}</div>
                 <div class="desc">NEW ${item.rarity.toUpperCase()} AXE!</div>
@@ -794,9 +875,12 @@
             </div>
           `;
         } else {
+          const iconHtml = shardsSrc
+            ? `<span class="icon"><img class="icon-img" src="${shardsSrc}" alt="" /></span>`
+            : '<span class="icon">💎</span>';
           return `
             <div class="loot-item shards">
-              <span class="icon">💎</span>
+              ${iconHtml}
               <div class="details">
                 <div class="name">+${item.amount} Shards</div>
                 <div class="desc">Duplicate ${item.axeName}</div>
@@ -882,36 +966,30 @@
     });
 
     // ========== Server Communication ==========
-    hytopia.onData(function(data) {
-      console.log('UI received:', data);
-
-      if (data.type === 'stateUpdate') {
-        gameState.power = data.power ?? gameState.power;
-        gameState.shards = data.shards ?? gameState.shards;
-        gameState.equippedAxe = data.equippedAxe ?? gameState.equippedAxe;
-        gameState.equippedAxeId = data.equippedAxeId ?? gameState.equippedAxeId;
-        gameState.collectedChests = data.collectedChests ?? gameState.collectedChests;
-        gameState.ownedAxes = data.ownedAxes ?? gameState.ownedAxes;
-        if (data.allAxes) gameState.allAxes = data.allAxes;
-        updateHUD();
-        
-        // Re-render panels if open
-        if (chestPanel.classList.contains('visible')) {
-          renderChestGrid();
+    hytopia.onData(function(raw) {
+      const data = raw && typeof raw === 'object' && raw.data !== undefined ? raw.data : raw;
+      if (!data || typeof data !== 'object') return;
+      try {
+        console.log('UI received:', data);
+        if (data.type === 'stateUpdate') {
+          gameState.power = data.power ?? gameState.power;
+          gameState.shards = data.shards ?? gameState.shards;
+          gameState.equippedAxe = data.equippedAxe ?? gameState.equippedAxe;
+          gameState.equippedAxeId = data.equippedAxeId ?? gameState.equippedAxeId;
+          gameState.collectedChests = Array.isArray(data.collectedChests) ? data.collectedChests : gameState.collectedChests;
+          gameState.ownedAxes = data.ownedAxes && typeof data.ownedAxes === 'object' ? data.ownedAxes : gameState.ownedAxes;
+          if (data.allAxes && Array.isArray(data.allAxes)) gameState.allAxes = data.allAxes;
+          updateHUD();
+          if (chestPanel.classList.contains('visible')) renderChestGrid();
+          if (inventoryPanel.classList.contains('visible')) renderAxeGrid();
+        } else if (data.type === 'lootResults') {
+          showLootResults(Array.isArray(data.results) ? data.results : []);
+        } else if (data.type === 'chestCollected' && Array.isArray(data.collectedChests)) {
+          gameState.collectedChests = data.collectedChests;
+          updateHUD();
         }
-        if (inventoryPanel.classList.contains('visible')) {
-          renderAxeGrid();
-        }
-      }
-
-      if (data.type === 'lootResults') {
-        showLootResults(data.results);
-      }
-
-      if (data.type === 'chestCollected') {
-        // Quick feedback for chest collection
-        gameState.collectedChests = data.collectedChests;
-        updateHUD();
+      } catch (err) {
+        console.error('[CutTrees UI] onData error:', err);
       }
     });
 

@@ -646,7 +646,7 @@
   <!-- Loot Modal -->
   <div class="loot-modal" id="loot-modal">
     <div class="loot-content">
-      <h2 class="loot-title">🎉 Chest Opened!</h2>
+      <h2 class="loot-title"><img class="icon-img title-icon" src="{{CDN_ASSETS_URL}}/icons/UI/Checkmark/64px/Checkmark 1st 64px.png" alt="" /> Chest Opened!</h2>
       <div class="loot-items" id="loot-items"></div>
       <button class="loot-close" id="loot-close">Awesome!</button>
     </div>
@@ -694,6 +694,8 @@
     };
 
     const SHARDS_ICON_PATH = 'currency/Crystal/64w/Crystal Blue 64px.png';
+    const LOCK_ICON_PATH = 'Item/Lock/64px/Lock 1st 64px.png';
+    const CHECKMARK_ICON_PATH = 'UI/Checkmark/64px/Checkmark 1st 64px.png';
 
     // ========== State ==========
     let gameState = {
@@ -772,9 +774,13 @@
           ? `<div class="axe-card-perk">${axe.perk}</div>`
           : '';
 
+        const lockSrc = iconUrl(LOCK_ICON_PATH);
+        const lockedBadgeContent = lockSrc
+          ? `<img class="icon-img" src="${lockSrc}" alt="" /> Locked`
+          : 'Locked';
         const badgeHtml = equipped
           ? '<div class="axe-card-badge equipped-badge">Equipped</div>'
-          : (!owned ? '<div class="axe-card-badge locked-badge">🔒 Locked</div>' : '<div class="axe-card-badge" style="opacity:0.5;font-size:10px;color:rgba(255,255,255,0.5);">Click to equip</div>');
+          : (!owned ? `<div class="axe-card-badge locked-badge">${lockedBadgeContent}</div>` : '<div class="axe-card-badge" style="opacity:0.5;font-size:10px;color:rgba(255,255,255,0.5);">Click to equip</div>');
 
         return `
           <div class="${classes}" data-axe-id="${axe.id}">
@@ -810,25 +816,25 @@
     }
 
     // ========== Chest Grid ==========
-    const CHEST_ICONS = {
-      common: '📦',
-      rare: '🎁',
-      epic: '💎',
-      mythic: '👑'
-    };
-
     function renderChestGrid() {
       if (gameState.collectedChests.length === 0) {
         chestGrid.innerHTML = '<div class="empty-message">No chests collected yet.<br>Chop trees near chests to unlock them!</div>';
         return;
       }
 
-      chestGrid.innerHTML = gameState.collectedChests.map((chest, index) => `
+      chestGrid.innerHTML = gameState.collectedChests.map((chest, index) => {
+        const path = CHEST_ICON_PATHS[chest.tier] || CHEST_ICON_PATHS.common;
+        const src = iconUrl(path);
+        const iconHtml = src
+          ? `<span class="icon"><img class="icon-img" src="${src}" alt="" /></span>`
+          : `<span class="icon">${chest.tier}</span>`;
+        return `
         <div class="chest-slot ${chest.tier}" data-index="${index}">
-          <span class="icon">${CHEST_ICONS[chest.tier] || '📦'}</span>
+          ${iconHtml}
           <span class="tier">${chest.tier}</span>
         </div>
-      `).join('');
+      `;
+      }).join('');
 
       // Add click handlers
       chestGrid.querySelectorAll('.chest-slot').forEach(slot => {
@@ -861,10 +867,8 @@
       lootItems.innerHTML = results.map(item => {
         if (item.kind === 'axe') {
           const axePath = AXE_ICON_PATHS[item.axeId] || AXE_ICON_PATHS.wooden;
-          const axeSrc = iconUrl(axePath);
-          const iconHtml = axeSrc
-            ? `<span class="icon"><img class="icon-img" src="${axeSrc}" alt="" /></span>`
-            : '<span class="icon">🪓</span>';
+          const axeSrc = iconUrl(axePath) || iconUrl(AXE_ICON_PATHS.wooden);
+          const iconHtml = `<span class="icon"><img class="icon-img" src="${axeSrc}" alt="" /></span>`;
           return `
             <div class="loot-item axe ${item.rarity}">
               ${iconHtml}
@@ -875,9 +879,8 @@
             </div>
           `;
         } else {
-          const iconHtml = shardsSrc
-            ? `<span class="icon"><img class="icon-img" src="${shardsSrc}" alt="" /></span>`
-            : '<span class="icon">💎</span>';
+          const shardsImgSrc = shardsSrc || iconUrl(SHARDS_ICON_PATH);
+          const iconHtml = `<span class="icon"><img class="icon-img" src="${shardsImgSrc}" alt="" /></span>`;
           return `
             <div class="loot-item shards">
               ${iconHtml}

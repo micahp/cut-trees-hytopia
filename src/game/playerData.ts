@@ -5,7 +5,9 @@
  * @see https://dev.hytopia.com/sdk-guides/players/persisted-player-data
  */
 
-import type { AxeId } from "./axes";
+import { AXES, type AxeId } from "./axes";
+
+const VALID_AXE_IDS = new Set<string>(Object.keys(AXES));
 
 /**
  * Persistent player data stored across sessions
@@ -122,7 +124,7 @@ export function loadPlayerData(player: any): PlayerData {
     return defaults;
   }
   
-  return {
+  const data: PlayerData = {
     ...DEFAULT_PLAYER_DATA,
     ...saved,
     ownedAxes: { ...DEFAULT_PLAYER_DATA.ownedAxes, ...saved.ownedAxes },
@@ -130,4 +132,73 @@ export function loadPlayerData(player: any): PlayerData {
     axeAreaBonus: { ...saved.axeAreaBonus },
     stats: { ...DEFAULT_PLAYER_DATA.stats, ...saved.stats },
   };
+  return data;
+}
+
+/**
+ * Repair desynced or invalid player data (invalid axe ids, missing owned, bad numbers).
+ * Mutates data in place and returns the minimal updates to persist.
+ * Call after loadPlayerData; if updates is non-empty, call setPersistedData(updates).
+ */
+export function repairPlayerData(data: PlayerData): Partial<PlayerData> {
+  const updates: Partial<PlayerData> = {};
+  let repaired = false;
+
+  // Ensure equippedAxe is a valid AxeId and that we own it
+  const validEquipped = VALID_AXE_IDS.has(data.equippedAxe) && AXES[data.equippedAxe as AxeId];
+  if (!validEquipped) {
+    data.equippedAxe = "wooden";
+    updates.equippedAxe = "wooden";
+    repaired = true;
+  }
+  if ((data.ownedAxes[data.equippedAxe as AxeId] ?? 0) < 1) {
+    data.ownedAxes[data.equippedAxe as AxeId] = 1;
+    updates.ownedAxes = { ...data.ownedAxes };
+    repaired = true;
+  }
+
+  // Sanitize ownedAxes: only valid axe ids, at least wooden
+  const sanitized: Partial<Record<AxeId, number>> = {};
+  for (const id of Object.keys(data.ownedAxes) as AxeId[]) {
+    if (VALID_AXE_IDS.has(id)) {
+      const n = data.ownedAxes[id] ?? 0;
+      if (typeof n === "number" && n >= 0 && Number.isFinite(n)) sanitized[id] = n;
+    }
+  }
+  if (!sanitized.wooden || sanitized.wooden < 1) sanitized.wooden = 1;
+  const ownedKeys = new Set(Object.keys(sanitized));
+  const prevKeys = new Set(Object.keys(data.ownedAxes));
+  if (ownedKeys.size !== prevKeys.size || [...ownedKeys].some(k => !prevKeys.has(k))) {
+    data.ownedAxes = sanitized;
+    updates.ownedAxes = sanitized;
+    repaired = true;
+  }
+
+  // Clamp numeric fields
+  if (typeof data.power !== "number" || !Number.isFinite(data.power) || data.power < 0) {
+    data.power = 0;
+    updates.power = 0;
+    repaired = true;
+  }
+  if (typeof data.shards !== "number" || !Number.isFinite(data.shards) || data.shards < 0) {
+    data.shards = 0;
+    updates.shards = 0;
+    repaired = true;
+  }
+  const stats = data.stats;
+  if (
+    typeof stats.treesChopped !== "number" || !Number.isFinite(stats.treesChopped) || stats.treesChopped < 0 ||
+    typeof stats.chestsOpened !== "number" || !Number.isFinite(stats.chestsOpened) || stats.chestsOpened < 0 ||
+    typeof stats.totalShardsClaimed !== "number" || !Number.isFinite(stats.totalShardsClaimed) || stats.totalShardsClaimed < 0
+  ) {
+    data.stats = {
+      treesChopped: Math.max(0, Number(stats.treesChopped) || 0),
+      chestsOpened: Math.max(0, Number(stats.chestsOpened) || 0),
+      totalShardsClaimed: Math.max(0, Number(stats.totalShardsClaimed) || 0),
+    };
+    updates.stats = data.stats;
+    repaired = true;
+  }
+
+  return repaired ? updates : {};
 }

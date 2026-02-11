@@ -30,7 +30,7 @@ import {
 import type { TreeSpawnPoint, ChestSpawnPoint } from './src/systems';
 
 // Game config
-import { TREES, TREE_IDS, AXES, loadPlayerData, openChest, applyChestRewards, generateWorldSpawnPoints } from './src/game';
+import { TREES, TREE_IDS, AXES, CHESTS, RARITY_DISPLAY_NAMES, loadPlayerData, openChest, applyChestRewards, generateWorldSpawnPoints } from './src/game';
 import type { TreeId, ChestTier, AxeId } from './src/game';
 
 /**
@@ -163,18 +163,18 @@ startServer(world => {
     const playerData = PlayerManager.loadPlayerData(player);
     const results = openChest(chestTier, playerData);
 
-    // Apply rewards
+    // Apply all rewards to the in-memory data object (mutates playerData)
     applyChestRewards(playerData, results);
 
-    // Save updated data
-    for (const result of results) {
-      if (result.kind === 'axe') {
-        PlayerManager.grantAxe(player, result.axeId);
-      } else {
-        PlayerManager.awardShards(player, result.amount);
-      }
-    }
-    PlayerManager.incrementChestsOpened(player);
+    // Single atomic save — avoids race conditions from multiple async
+    // setPersistedData calls that each load-then-save independently.
+    // applyChestRewards already mutated ownedAxes, shards, and stats,
+    // so we persist all changed top-level keys in one call.
+    PlayerManager.savePlayerData(player, {
+      ownedAxes: playerData.ownedAxes,
+      shards: playerData.shards,
+      stats: playerData.stats,
+    });
 
     // Format results for UI
     const uiResults = results.map(result => {
@@ -208,16 +208,24 @@ startServer(world => {
   }
 
   /**
-   * Handle click on a locked axe in inventory — tell player what they need to equip it
+   * Handle click on a locked axe in inventory — tell player which chests can drop it
    */
   function handleLockedAxeClick(player: any, axeId: string) {
     const axe = AXES[axeId as AxeId];
     if (!axe) return;
-    world.chatManager.sendPlayerMessage(
-      player,
-      `${axe.name} is locked. Open chests to get axes — then you can equip them here.`,
-      'FFD700'
-    );
+
+    // Find which chest tiers can drop this axe's rarity (non-zero weight)
+    const sources = (Object.entries(CHESTS) as Array<[ChestTier, typeof CHESTS[ChestTier]]>)
+      .filter(([, chest]) => chest.dropTable[axe.rarity] > 0)
+      .map(([, chest]) => `${chest.name} (${chest.dropTable[axe.rarity]}%)`)
+      .join(', ');
+
+    const rarityLabel = RARITY_DISPLAY_NAMES[axe.rarity];
+    const hint = sources
+      ? `${axe.name} (${rarityLabel}) — found in: ${sources}.`
+      : `${axe.name} (${rarityLabel}) — not currently available from chests.`;
+
+    world.chatManager.sendPlayerMessage(player, hint, 'FFD700');
   }
 
   /**
@@ -261,6 +269,14 @@ startServer(world => {
     
     // Load/initialize player data
     const playerData = PlayerManager.loadPlayerData(player);
+    
+    // Data integrity: ensure equipped axe is in ownedAxes.
+    // Race conditions with async setPersistedData can desync these.
+    if (AXES[playerData.equippedAxe] && !playerData.ownedAxes[playerData.equippedAxe]) {
+      console.warn(`[CutTrees] Integrity fix: ${player.username} has equippedAxe="${playerData.equippedAxe}" but doesn't own it — adding to ownedAxes`);
+      playerData.ownedAxes[playerData.equippedAxe] = 1;
+      PlayerManager.savePlayerData(player, { ownedAxes: playerData.ownedAxes });
+    }
     
     // Initialize session
     PlayerManager.initSession(player);
@@ -330,6 +346,11 @@ startServer(world => {
    */
   world.on(PlayerEvent.RECONNECTED_WORLD, ({ player }) => {
     player.ui.load('ui/index.html');
+
+    // Re-send full state + axe defs after UI reloads (same as initial join)
+    setTimeout(() => {
+      sendUIStateUpdate(player, true);
+    }, 500);
   });
 
   /**

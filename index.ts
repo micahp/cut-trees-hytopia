@@ -146,18 +146,28 @@ startServer(world => {
   /**
    * Handle opening a chest from UI
    */
-  function handleOpenChest(player: any, index: number) {
+  function handleOpenChest(player: any, index: unknown) {
     const session = PlayerManager.getSession(player);
-    if (!session || index < 0 || index >= session.collectedChests.length) {
+    if (!session) {
+      sendUIStateUpdate(player);
+      return;
+    }
+    const idx = typeof index === 'number' ? index : parseInt(String(index), 10);
+    if (!Number.isInteger(idx) || idx < 0 || idx >= session.collectedChests.length) {
+      sendUIStateUpdate(player);
       return;
     }
 
     // Get the chest from inventory
-    const chest = session.collectedChests[index];
+    const chest = session.collectedChests[idx];
+    if (!chest) {
+      sendUIStateUpdate(player);
+      return;
+    }
     const chestTier = chest.tier as ChestTier;
 
     // Remove from inventory
-    session.collectedChests.splice(index, 1);
+    session.collectedChests.splice(idx, 1);
 
     // Roll loot using the loot system
     const playerData = PlayerManager.loadPlayerData(player);

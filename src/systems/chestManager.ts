@@ -114,6 +114,15 @@ export class ChestManager {
   }
 
   /**
+   * Spawn chests only at the given spawn points (e.g. when adding a new area).
+   */
+  spawnSpawnPoints(points: ChestSpawnPoint[]): void {
+    for (const point of points) {
+      this.spawnChest(point);
+    }
+  }
+
+  /**
    * Spawn a chest at a spawn point (uses authored tier if set, otherwise random)
    */
   private spawnChest(point: ChestSpawnPoint): void {
@@ -312,6 +321,33 @@ export class ChestManager {
   getPlayerTreeChops(player: Player, spawnPointId: string): number {
     const playerId = player.id ?? player.username;
     return this.treeChopsNearSpawnPoint.get(spawnPointId)?.get(playerId) ?? 0;
+  }
+
+  /**
+   * Try to collect the nearest chest within interaction radius of the player's position.
+   * Used as a backup when the player's raycast doesn't directly hit a chest entity.
+   */
+  tryCollectNearby(player: Player, playerPosition: Vec3): void {
+    const radiusSq = CHEST_CONSTANTS.INTERACTION_RADIUS * CHEST_CONSTANTS.INTERACTION_RADIUS;
+    let nearest: ChestInstance | null = null;
+    let nearestDistSq = Infinity;
+
+    for (const chest of this.chests.values()) {
+      if (chest.isCollected) continue;
+
+      const dx = chest.position.x - playerPosition.x;
+      const dz = chest.position.z - playerPosition.z;
+      const distSq = dx * dx + dz * dz;
+
+      if (distSq <= radiusSq && distSq < nearestDistSq) {
+        nearest = chest;
+        nearestDistSq = distSq;
+      }
+    }
+
+    if (!nearest) return;
+
+    this.handleChestInteraction(nearest.id, player);
   }
 
   /**

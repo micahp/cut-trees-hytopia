@@ -110,10 +110,12 @@ export class ChoppingSystem {
       };
     }
 
+    // Try to collect a nearby chest based on player proximity (backup for missed raycast)
+    this.chestManager.tryCollectNearby(player, playerPos);
+
     const treesInRange = this.treeManager.getTreesInRadius(hitPoint, searchRadius);
 
     if (treesInRange.length === 0) {
-      // No trees hit - maybe send feedback
       return;
     }
 

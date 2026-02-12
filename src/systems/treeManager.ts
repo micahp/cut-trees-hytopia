@@ -100,6 +100,15 @@ export class TreeManager {
   }
 
   /**
+   * Spawn trees only at the given spawn points (e.g. when adding a new area).
+   */
+  spawnSpawnPoints(points: TreeSpawnPoint[]): void {
+    for (const point of points) {
+      this.spawnTree(point);
+    }
+  }
+
+  /**
    * Spawn a tree at a spawn point
    */
   private spawnTree(point: TreeSpawnPoint): void {

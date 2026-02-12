@@ -2,7 +2,8 @@
  * Cut Trees - HYTOPIA Game Server
  * 
  * A tree-chopping progression game with:
- * - Multiple axe tiers (Common → Exotic)
+ * - Multiplayer lobby (elevated platform at y=50, box-seats view)
+ * - Multiple axe tiers (Common -> Exotic)
  * - AoE chopping mechanics
  * - Chest rewards with rarity drops
  * - Player power progression
@@ -28,6 +29,14 @@ import {
   ChoppingSystem,
 } from './src/systems';
 import type { TreeSpawnPoint, ChestSpawnPoint } from './src/systems';
+import {
+  buildLobbyPlatform,
+  addArenaBlocksAtOffset,
+  isOnLobbyPad,
+  getAreaSpawnPosition,
+  AREA_STRIDE,
+  LOBBY_SPAWN,
+} from './src/systems/lobbyGameRouter';
 
 // Game config
 import { TREES, TREE_IDS, AXES, CHESTS, RARITY_DISPLAY_NAMES, loadPlayerData, repairPlayerData, openChest, applyChestRewards, generateWorldSpawnPoints } from './src/game';
@@ -35,7 +44,6 @@ import type { TreeId, ChestTier, AxeId } from './src/game';
 
 /**
  * Pre-computed axe definitions for UI (sent once to each client).
- * Includes all info the inventory panel needs to render.
  */
 const ALL_AXES_FOR_UI = Object.values(AXES).map(axe => ({
   id: axe.id,
@@ -49,79 +57,143 @@ const ALL_AXES_FOR_UI = Object.values(AXES).map(axe => ({
     : null,
 }));
 
-// World generation is now handled by src/game/worldGeneration.ts
-// with proper tree clustering around chests and outer ring patterns
+// ─── Server entry ────────────────────────────────────────────────────────────
 
 startServer(world => {
   console.log('[CutTrees] Starting server...');
-  
-  // Initialize game systems
+
+  // Load the arena map at ground level (y=0). This also registers block types.
+  world.loadMap(worldMap);
+
+  // Build the elevated lobby platform (y=50) in the SAME world.
+  buildLobbyPlatform(world);
+
+  // ── Game systems (all bound to this single world) ──────────────────────────
   const timers = new WorldLoopTimerManager(world);
   const treeManager = new TreeManager(world, timers);
   const chestManager = new ChestManager(world, timers);
   const choppingSystem = new ChoppingSystem(world, treeManager, chestManager);
-  
-  // Set up chopping input handlers
   choppingSystem.initialize();
 
-  // Load our map
-  world.loadMap(worldMap);
-
-  // Generate world spawn points using authored patterns
-  // (outer ring trees, chest-aware clusters, interior groves)
+  // Area 0 spawn points (base arena at origin)
   const { trees: treeSpawnPoints, chests: chestSpawnPoints } = generateWorldSpawnPoints(
     worldMap as { blocks: Record<string, number> },
-    40 // Target chest count
+    40,
   );
-  
-  // Spawn trees
   treeManager.addSpawnPoints(treeSpawnPoints);
-  treeManager.spawnAll();
-  console.log(`[CutTrees] Spawned ${treeSpawnPoints.length} trees`);
-  
-  // Debug: show sample tree positions
-  console.log('[CutTrees] Sample tree positions (x, y, z):');
-  treeSpawnPoints.slice(0, 5).forEach(p => {
-    console.log(`  ${p.treeId}: (${p.position.x}, ${p.position.y}, ${p.position.z})`);
-  });
-
-  // Spawn chests with authored tiers
   chestManager.addSpawnPoints(chestSpawnPoints);
+  treeManager.spawnAll();
   chestManager.spawnAll();
-  console.log(`[CutTrees] Spawned ${chestSpawnPoints.length} chests`);
-  
-  // Debug: show chest tier distribution
-  const tierCounts = chestSpawnPoints.reduce((acc, p) => {
-    acc[p.chestType] = (acc[p.chestType] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-  console.log(`[CutTrees] Chest tiers: ${JSON.stringify(tierCounts)}`);
-  
-  // Debug: show sample chest positions
-  console.log('[CutTrees] Sample chest positions (type, x, y, z):');
-  chestSpawnPoints.slice(0, 5).forEach(p => {
-    console.log(`  ${p.chestType}: (${p.position.x}, ${p.position.y}, ${p.position.z})`);
-  });
+  console.log(`[CutTrees] Arena ready: ${treeSpawnPoints.length} trees, ${chestSpawnPoints.length} chests`);
 
-  // Wire up tree chop tracking for chest unlocks
+  // ── Player state tracking ──────────────────────────────────────────────────
+  /** Players currently in the lobby (not yet teleported to an arena). */
+  const lobbyPlayers = new Set<string>();
+  /** Next area index to assign when a player starts. */
+  let nextAreaIndex = 0;
+
+  // Tree/chest callbacks
   treeManager.setOnTreeChopped((tree, player) => {
     chestManager.trackTreeChop(player, tree.position);
     sendUIStateUpdate(player);
   });
-
-  // Wire up chest collection callback for UI updates
-  chestManager.setOnChestCollected((player, chest) => {
+  chestManager.setOnChestCollected((player) => {
     sendUIStateUpdate(player);
   });
 
+  // ── Send player to arena ───────────────────────────────────────────────────
+
   /**
-   * Send UI state update to player
+   * Teleport a player from the lobby to their own arena area.
+   * - Despawns lobby entity
+   * - Adds new arena blocks if areaIndex > 0
+   * - Spawns a new entity at the arena centre
+   * - Initialises game session + UI
    */
+  function sendPlayerToArena(player: any): void {
+    const playerId = player.id ?? player.username;
+    if (!lobbyPlayers.has(playerId)) return; // already sent or not in lobby
+    lobbyPlayers.delete(playerId);
+
+    // Despawn lobby entity
+    world.entityManager.getPlayerEntitiesByPlayer(player).forEach((e: any) => e.despawn());
+
+    // Assign area
+    const areaIndex = nextAreaIndex++;
+    if (areaIndex > 0) {
+      const offsetX = areaIndex * AREA_STRIDE;
+      addArenaBlocksAtOffset(world, worldMap as { blocks: Record<string, number> }, offsetX);
+      const { trees: baseTrees, chests: baseChests } = generateWorldSpawnPoints(
+        worldMap as { blocks: Record<string, number> },
+        40,
+      );
+      const treePoints: TreeSpawnPoint[] = baseTrees.map((t, i) => ({
+        ...t,
+        id: `tree-area${areaIndex}-${i}`,
+        position: { x: t.position.x + offsetX, y: t.position.y, z: t.position.z },
+      }));
+      const chestPoints: ChestSpawnPoint[] = baseChests.map((c, i) => ({
+        ...c,
+        id: `chest-area${areaIndex}-${i}`,
+        position: { x: c.position.x + offsetX, y: c.position.y, z: c.position.z },
+      }));
+      treeManager.addSpawnPoints(treePoints);
+      chestManager.addSpawnPoints(chestPoints);
+      treeManager.spawnSpawnPoints(treePoints);
+      chestManager.spawnSpawnPoints(chestPoints);
+    }
+
+    const spawnPos = getAreaSpawnPosition(areaIndex);
+
+    // Load / repair player data
+    const playerData = PlayerManager.loadPlayerData(player);
+    const repairs = repairPlayerData(playerData);
+    if (Object.keys(repairs).length > 0) {
+      PlayerManager.savePlayerData(player, repairs);
+    }
+    PlayerManager.initSession(player);
+
+    // Spawn player entity at arena
+    const playerEntity = new DefaultPlayerEntity({ player, name: player.username });
+    playerEntity.spawn(world, spawnPos);
+    player.camera.setAttachedToEntity(playerEntity); // Re-attach camera; it was bound to the despawned lobby entity
+    PlayerManager.equipAxe(player, playerEntity, world, playerData.equippedAxe);
+
+    // Tell UI to switch from lobby to game mode
+    player.ui.sendData({ type: 'enterGame' });
+
+    // Send full game state (with axe defs)
+    setTimeout(() => sendUIStateUpdate(player, true), 300);
+
+    const axe = AXES[playerData.equippedAxe];
+    world.chatManager.sendPlayerMessage(player, '🌲 Welcome to Cut Trees!', '00FF00');
+    world.chatManager.sendPlayerMessage(player, `Power: ${playerData.power.toLocaleString()} | Shards: ${playerData.shards}`, 'FFD700');
+    world.chatManager.sendPlayerMessage(player, `Equipped: ${axe.name} (${axe.rarity})`, '4FC3F7');
+    world.chatManager.sendPlayerMessage(player, 'Left-click to chop trees! Click "Chests" to open collected chests.', 'FFFFFF');
+
+    console.log(`[CutTrees] ${player.username} teleported to area ${areaIndex}`);
+  }
+
+  // ── Lobby pad proximity check ──────────────────────────────────────────────
+
+  setInterval(() => {
+    const allPlayerEntities = world.entityManager.getAllPlayerEntities();
+    for (const pe of allPlayerEntities) {
+      const pid = pe.player?.id ?? pe.player?.username;
+      if (!pid || !lobbyPlayers.has(pid)) continue;
+      if (isOnLobbyPad(pe.position)) {
+        sendPlayerToArena(pe.player);
+      }
+    }
+  }, 250);
+
+  // ── UI helpers ─────────────────────────────────────────────────────────────
+
   function sendUIStateUpdate(player: any, includeAxeDefs: boolean = false) {
     const data = PlayerManager.loadPlayerData(player);
     const session = PlayerManager.getSession(player);
     const axe = AXES[data.equippedAxe];
-    
+
     const payload: Record<string, any> = {
       type: 'stateUpdate',
       power: data.power,
@@ -134,257 +206,132 @@ startServer(world => {
         spawnPointId: c.spawnPointId,
       })) ?? [],
     };
-
-    // Send axe definitions on first update (so UI can render inventory)
-    if (includeAxeDefs) {
-      payload.allAxes = ALL_AXES_FOR_UI;
-    }
-
+    if (includeAxeDefs) payload.allAxes = ALL_AXES_FOR_UI;
     player.ui.sendData(payload);
   }
 
-  /**
-   * Handle opening a chest from UI
-   */
   function handleOpenChest(player: any, index: unknown) {
     const session = PlayerManager.getSession(player);
-    if (!session) {
-      sendUIStateUpdate(player);
-      return;
-    }
+    if (!session) { sendUIStateUpdate(player); return; }
     const idx = typeof index === 'number' ? index : parseInt(String(index), 10);
     if (!Number.isInteger(idx) || idx < 0 || idx >= session.collectedChests.length) {
       sendUIStateUpdate(player);
       return;
     }
-
-    // Get the chest from inventory
     const chest = session.collectedChests[idx];
-    if (!chest) {
-      sendUIStateUpdate(player);
-      return;
-    }
+    if (!chest) { sendUIStateUpdate(player); return; }
     const chestTier = chest.tier as ChestTier;
-
-    // Remove from inventory
     session.collectedChests.splice(idx, 1);
 
-    // Roll loot using the loot system
     const playerData = PlayerManager.loadPlayerData(player);
     const results = openChest(chestTier, playerData);
-
-    // Apply all rewards to the in-memory data object (mutates playerData)
     applyChestRewards(playerData, results);
-
-    // Single atomic save — avoids race conditions from multiple async
-    // setPersistedData calls that each load-then-save independently.
-    // applyChestRewards already mutated ownedAxes, shards, and stats,
-    // so we persist all changed top-level keys in one call.
     PlayerManager.savePlayerData(player, {
       ownedAxes: playerData.ownedAxes,
       shards: playerData.shards,
       stats: playerData.stats,
     });
 
-    // Format results for UI
     const uiResults = results.map(result => {
       if (result.kind === 'axe') {
         const axe = AXES[result.axeId];
-        return {
-          kind: 'axe',
-          axeId: result.axeId,
-          axeName: axe.name,
-          rarity: result.rarity,
-        };
+        return { kind: 'axe', axeId: result.axeId, axeName: axe.name, rarity: result.rarity };
       } else {
         const axe = AXES[result.sourceAxeId];
-        return {
-          kind: 'shards',
-          amount: result.amount,
-          axeName: axe.name,
-          rarity: result.rarity,
-        };
+        return { kind: 'shards', amount: result.amount, axeName: axe.name, rarity: result.rarity };
       }
     });
-
-    // Send loot results to UI
-    player.ui.sendData({
-      type: 'lootResults',
-      results: uiResults,
-    });
-
-    // Send updated state
+    player.ui.sendData({ type: 'lootResults', results: uiResults });
     sendUIStateUpdate(player);
   }
 
-  /**
-   * Handle click on a locked axe in inventory — tell player which chests can drop it
-   */
   function handleLockedAxeClick(player: any, axeId: string) {
     const axe = AXES[axeId as AxeId];
     if (!axe) return;
-
-    // Find which chest tiers can drop this axe's rarity (non-zero weight)
     const sources = (Object.entries(CHESTS) as Array<[ChestTier, typeof CHESTS[ChestTier]]>)
       .filter(([, chest]) => chest.dropTable[axe.rarity] > 0)
       .map(([, chest]) => `${chest.name} (${chest.dropTable[axe.rarity]}%)`)
       .join(', ');
-
     const rarityLabel = RARITY_DISPLAY_NAMES[axe.rarity];
     const hint = sources
       ? `${axe.name} (${rarityLabel}) — found in: ${sources}.`
       : `${axe.name} (${rarityLabel}) — not currently available from chests.`;
-
     world.chatManager.sendPlayerMessage(player, hint, 'FFD700');
   }
 
-  /**
-   * Handle equipping an axe from the inventory UI
-   */
   function handleEquipAxe(player: any, axeId: string) {
     const playerData = PlayerManager.loadPlayerData(player);
-
-    // Validate axe exists
     if (!AXES[axeId as AxeId]) {
       world.chatManager.sendPlayerMessage(player, `Unknown axe: ${axeId}`, 'FF6B6B');
       return;
     }
-
-    // Validate player owns it
     if (!playerData.ownedAxes[axeId as AxeId]) {
       world.chatManager.sendPlayerMessage(player, `You don't own that axe!`, 'FF6B6B');
       return;
     }
-
-    // Already equipped?
-    if (playerData.equippedAxe === axeId) {
-      return;
-    }
-
-    // Equip it
+    if (playerData.equippedAxe === axeId) return;
     const playerEntity = world.entityManager.getPlayerEntitiesByPlayer(player)[0];
     if (playerEntity) {
       PlayerManager.equipAxe(player, playerEntity, world, axeId as AxeId);
-      const axeDef = AXES[axeId as AxeId];
-      world.chatManager.sendPlayerMessage(player, `Equipped: ${axeDef.name}`, '00FF00');
+      world.chatManager.sendPlayerMessage(player, `Equipped: ${AXES[axeId as AxeId].name}`, '00FF00');
       sendUIStateUpdate(player);
     }
   }
 
-  /**
-   * Handle player joining the game
-   */
+  // ── World events ───────────────────────────────────────────────────────────
+
   world.on(PlayerEvent.JOINED_WORLD, ({ player }) => {
     console.log(`[CutTrees] Player joined: ${player.username}`);
-    
-    // Load/initialize player data
-    const playerData = PlayerManager.loadPlayerData(player);
-    
-    // Snapshot key fields before repair (persisted/server values)
-    const serverSnapshot = {
-      equippedAxe: playerData.equippedAxe,
-      ownedAxes: { ...playerData.ownedAxes },
-      power: playerData.power,
-      shards: playerData.shards,
-      stats: { ...playerData.stats },
-    };
-    
-    // Repair desynced or invalid data (invalid equipped axe, missing ownership, bad numbers)
-    const repairs = repairPlayerData(playerData);
-    const localSnapshot = {
-      equippedAxe: playerData.equippedAxe,
-      ownedAxes: playerData.ownedAxes,
-      power: playerData.power,
-      shards: playerData.shards,
-      stats: playerData.stats,
-    };
-    console.log(`[CutTrees] ${player.username} — Server (persisted):`, JSON.stringify(serverSnapshot));
-    console.log(`[CutTrees] ${player.username} — Local (after repair):`, JSON.stringify(localSnapshot));
-    if (Object.keys(repairs).length > 0) {
-      console.log(`[CutTrees] Data repair for ${player.username}:`, Object.keys(repairs));
-      PlayerManager.savePlayerData(player, repairs);
-    }
-    
-    // Initialize session
-    PlayerManager.initSession(player);
+    const playerId = player.id ?? player.username;
+    lobbyPlayers.add(playerId);
 
-    // Create player entity
-    const playerEntity = new DefaultPlayerEntity({
-      player,
-      name: player.username,
-    });
-    playerEntity.spawn(world, { x: 0, y: 10, z: 0 });
+    // Spawn at lobby
+    const playerEntity = new DefaultPlayerEntity({ player, name: player.username });
+    playerEntity.spawn(world, LOBBY_SPAWN);
 
-    // Equip their saved axe
-    PlayerManager.equipAxe(player, playerEntity, world, playerData.equippedAxe);
-
-    // Load game UI
+    // Load UI (starts in lobby mode — PLAY button visible, HUD hidden)
     player.ui.load('ui/index.html');
 
-    // Set up UI event handlers
+    // Listen for UI messages (works for both lobby and game states)
     player.ui.on(PlayerUIEvent.DATA, ({ data }: any) => {
-      if (data?.type === 'openChest') {
-        handleOpenChest(player, data.index);
+      if (data?.type === 'play') {
+        // PLAY button clicked — teleport to arena
+        sendPlayerToArena(player);
       }
+      if (data?.type === 'openChest') handleOpenChest(player, data.index);
       if (data?.type === 'requestChop') {
-        // Auto-chop: find and damage nearest tree
         const chopped = choppingSystem.autoChop(player);
-        if (chopped) {
-          sendUIStateUpdate(player);
-        }
+        if (chopped) sendUIStateUpdate(player);
       }
-      if (data?.type === 'equipAxe') {
-        handleEquipAxe(player, data.axeId);
-      }
-      if (data?.type === 'lockedAxeClick') {
-        handleLockedAxeClick(player, data.axeId);
-      }
+      if (data?.type === 'equipAxe') handleEquipAxe(player, data.axeId);
+      if (data?.type === 'lockedAxeClick') handleLockedAxeClick(player, data.axeId);
     });
 
-    // Send initial state to UI after a short delay (let UI load)
-    // Include axe definitions on first load so inventory can render
-    setTimeout(() => {
-      sendUIStateUpdate(player, true);
-    }, 500);
-
-    // Welcome messages
-    const axe = AXES[playerData.equippedAxe];
-    world.chatManager.sendPlayerMessage(player, '🌲 Welcome to Cut Trees!', '00FF00');
-    world.chatManager.sendPlayerMessage(player, `Power: ${playerData.power.toLocaleString()} | Shards: ${playerData.shards}`, 'FFD700');
-    world.chatManager.sendPlayerMessage(player, `Equipped: ${axe.name} (${axe.rarity})`, '4FC3F7');
-    world.chatManager.sendPlayerMessage(player, 'Left-click to chop trees! Click "Chests" to open collected chests.', 'FFFFFF');
+    world.chatManager.sendPlayerMessage(player, 'Welcome! Step on the glowing pad or click PLAY to start.', '00FF00');
   });
 
-  /**
-   * Handle player leaving
-   */
   world.on(PlayerEvent.LEFT_WORLD, ({ player }) => {
     console.log(`[CutTrees] Player left: ${player.username}`);
-    
-    // Clean up session
+    const playerId = player.id ?? player.username;
+    lobbyPlayers.delete(playerId);
     PlayerManager.clearSession(player);
-    
-    // Despawn player entities
-    world.entityManager.getPlayerEntitiesByPlayer(player).forEach(entity => entity.despawn());
+    world.entityManager.getPlayerEntitiesByPlayer(player).forEach((e: any) => e.despawn());
   });
 
-  /**
-   * Handle reconnection
-   */
   world.on(PlayerEvent.RECONNECTED_WORLD, ({ player }) => {
     player.ui.load('ui/index.html');
-
-    // Re-send full state + axe defs after UI reloads (same as initial join)
-    setTimeout(() => {
-      sendUIStateUpdate(player, true);
-    }, 500);
+    const playerId = player.id ?? player.username;
+    if (!lobbyPlayers.has(playerId)) {
+      // Player was in the game — re-send game mode + state
+      setTimeout(() => {
+        player.ui.sendData({ type: 'enterGame' });
+        sendUIStateUpdate(player, true);
+      }, 500);
+    }
   });
 
-  /**
-   * Chat commands for testing/debugging
-   */
-  
-  // /stats - Show player stats
+  // ── Chat commands ──────────────────────────────────────────────────────────
+
   world.chatManager.registerCommand('/stats', player => {
     const data = PlayerManager.loadPlayerData(player);
     world.chatManager.sendPlayerMessage(player, '--- Your Stats ---', 'FFD700');
@@ -392,27 +339,22 @@ startServer(world => {
     world.chatManager.sendPlayerMessage(player, `Shards: ${data.shards}`, 'FFFFFF');
     world.chatManager.sendPlayerMessage(player, `Trees Chopped: ${data.stats.treesChopped}`, 'FFFFFF');
     world.chatManager.sendPlayerMessage(player, `Chests Opened: ${data.stats.chestsOpened}`, 'FFFFFF');
-    
     const ownedAxes = Object.keys(data.ownedAxes).filter(k => data.ownedAxes[k as keyof typeof data.ownedAxes]);
     world.chatManager.sendPlayerMessage(player, `Owned Axes: ${ownedAxes.join(', ')}`, 'FFFFFF');
   });
 
-  // /equip <axe> - Equip an axe
   world.chatManager.registerCommand('/equip', (player, args) => {
     const axeId = (Array.isArray(args) ? args[0] : args) as keyof typeof AXES;
     const data = PlayerManager.loadPlayerData(player);
-    
     if (!axeId || !AXES[axeId]) {
       world.chatManager.sendPlayerMessage(player, `Unknown axe: ${axeId}`, 'FF6B6B');
       world.chatManager.sendPlayerMessage(player, `Available: ${Object.keys(AXES).join(', ')}`, 'FFFFFF');
       return;
     }
-    
     if (!data.ownedAxes[axeId]) {
       world.chatManager.sendPlayerMessage(player, `You don't own the ${AXES[axeId].name}!`, 'FF6B6B');
       return;
     }
-    
     const playerEntity = world.entityManager.getPlayerEntitiesByPlayer(player)[0];
     if (playerEntity) {
       PlayerManager.equipAxe(player, playerEntity, world, axeId);
@@ -420,15 +362,12 @@ startServer(world => {
     }
   });
 
-  // /give <axe> - Debug: give an axe
   world.chatManager.registerCommand('/give', (player, args) => {
     const axeId = (Array.isArray(args) ? args[0] : args) as keyof typeof AXES;
-    
     if (!axeId || !AXES[axeId]) {
       world.chatManager.sendPlayerMessage(player, `Unknown axe: ${axeId}`, 'FF6B6B');
       return;
     }
-    
     const granted = PlayerManager.grantAxe(player, axeId);
     if (granted) {
       world.chatManager.sendPlayerMessage(player, `Granted: ${AXES[axeId].name}!`, '00FF00');
@@ -437,7 +376,6 @@ startServer(world => {
     }
   });
 
-  // /power <amount> - Debug: add power
   world.chatManager.registerCommand('/power', (player, args) => {
     const argStr = Array.isArray(args) ? args[0] : args;
     const amount = parseInt(argStr, 10) || 1000;
@@ -445,14 +383,31 @@ startServer(world => {
     world.chatManager.sendPlayerMessage(player, `Power: ${newPower.toLocaleString()} (+${amount})`, '00FF00');
   });
 
-  // /rocket - Fun easter egg
   world.chatManager.registerCommand('/rocket', player => {
-    world.entityManager.getPlayerEntitiesByPlayer(player).forEach(entity => {
+    world.entityManager.getPlayerEntitiesByPlayer(player).forEach((entity: any) => {
       entity.applyImpulse({ x: 0, y: 20, z: 0 });
     });
   });
 
-  // Play ambient music
+  // Debug: return to lobby
+  world.chatManager.registerCommand('/lobby', player => {
+    const playerId = player.id ?? player.username;
+    if (lobbyPlayers.has(playerId)) {
+      world.chatManager.sendPlayerMessage(player, 'You are already in the lobby.', 'FF6B6B');
+      return;
+    }
+    // Despawn game entity, re-spawn at lobby
+    world.entityManager.getPlayerEntitiesByPlayer(player).forEach((e: any) => e.despawn());
+    PlayerManager.clearSession(player);
+    lobbyPlayers.add(playerId);
+    const pe = new DefaultPlayerEntity({ player, name: player.username });
+    pe.spawn(world, LOBBY_SPAWN);
+    player.camera.setAttachedToEntity(pe); // Re-attach camera to new lobby entity
+    player.ui.sendData({ type: 'enterLobby' });
+    world.chatManager.sendPlayerMessage(player, 'Returned to lobby.', '00FF00');
+  });
+
+  // Ambient music
   new Audio({
     uri: 'audio/music/hytopia-main-theme.mp3',
     loop: true,

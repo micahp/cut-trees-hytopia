@@ -23,6 +23,7 @@ interface TreeInstance {
   currentHp: number;
   maxHp: number;
   powerReward: number;
+  shardReward: number;
   position: Vec3;
   groundY: number;
   isChopped: boolean;
@@ -122,7 +123,7 @@ export class TreeManager {
     const groundY = this.getGroundY(point.position.y);
 
     // Apply world multipliers
-    const { maxHp, powerReward } = applyWorldMultipliers(def, this.worldType);
+    const { maxHp, powerReward, shardReward } = applyWorldMultipliers(def, this.worldType);
 
     // Create tree entity
     const entity = new Entity({
@@ -144,6 +145,7 @@ export class TreeManager {
       currentHp: maxHp,
       maxHp,
       powerReward,
+      shardReward,
       position: { x: point.position.x, y: groundY, z: point.position.z },
       groundY,
       isChopped: false,
@@ -199,8 +201,11 @@ export class TreeManager {
   private chopTree(tree: TreeInstance, player: Player): void {
     tree.isChopped = true;
 
-    // Award power to player
+    // Award power and shards to player
     PlayerManager.awardPower(player, tree.powerReward);
+    if (tree.shardReward > 0) {
+      PlayerManager.awardShards(player, tree.shardReward);
+    }
     PlayerManager.incrementTreesChopped(player);
 
     // Play tree fall sound at tree position (quieter)

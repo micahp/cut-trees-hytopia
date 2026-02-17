@@ -161,24 +161,47 @@ export function getTreesByTier(tier: TreeTier): TreeDef[] {
 }
 
 /**
+ * Base shards per tree by tier (research-backed: predictable stream for retention).
+ * @see docs/economy-tuning.md
+ */
+export const SHARD_BASE_BY_TIER: Record<TreeTier, number> = {
+  1: 1,  // Small trees
+  2: 2,  // Medium trees
+  3: 4,  // Large trees
+  4: 4,  // Palm/special
+};
+
+/**
  * World multipliers for different biomes.
- * Lava world: HP x10, Power gain x3 (harder but rewarding)
+ * Lava world: HP x10, Power gain x3, Shards x3 (harder but rewarding)
  */
 export type WorldMultipliers = {
   hpMultiplier: number;
   powerMultiplier: number;
+  shardMultiplier: number;
 };
 
 export const WORLD_MULTIPLIERS: Record<string, WorldMultipliers> = {
-  forest: { hpMultiplier: 1, powerMultiplier: 1 },
-  lava: { hpMultiplier: 10, powerMultiplier: 3 },
+  forest: { hpMultiplier: 1, powerMultiplier: 1, shardMultiplier: 1 },
+  lava: { hpMultiplier: 10, powerMultiplier: 3, shardMultiplier: 3 },
+};
+
+export type WorldMultiplierResult = {
+  maxHp: number;
+  powerReward: number;
+  shardReward: number;
 };
 
 /** Apply world multipliers to a tree definition */
-export function applyWorldMultipliers(tree: TreeDef, world: string): { maxHp: number; powerReward: number } {
+export function applyWorldMultipliers(
+  tree: TreeDef,
+  world: string
+): WorldMultiplierResult {
   const multipliers = WORLD_MULTIPLIERS[world] ?? WORLD_MULTIPLIERS.forest;
+  const baseShards = SHARD_BASE_BY_TIER[tree.tier];
   return {
     maxHp: Math.round(tree.maxHp * multipliers.hpMultiplier),
     powerReward: Math.round(tree.powerReward * multipliers.powerMultiplier),
+    shardReward: Math.round(baseShards * multipliers.shardMultiplier),
   };
 }

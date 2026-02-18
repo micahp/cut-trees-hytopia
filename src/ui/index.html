@@ -66,6 +66,33 @@
       filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5));
     }
 
+    /* ========== Chop Reward Popup ========== */
+    .chop-reward-container {
+      position: fixed;
+      bottom: 160px;
+      left: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      pointer-events: none;
+      z-index: 50;
+    }
+    .chop-reward {
+      font-size: 14px;
+      font-weight: 700;
+      white-space: nowrap;
+      animation: chopRewardFloat 1s ease-out forwards;
+      display: flex;
+      gap: 8px;
+    }
+    .chop-reward .power-part { color: #b8ff2e; text-shadow: 0 0 6px rgba(184, 255, 46, 0.6); }
+    .chop-reward .shard-part { color: #4dd0ff; text-shadow: 0 0 6px rgba(77, 208, 255, 0.6); }
+    @keyframes chopRewardFloat {
+      0%   { opacity: 1; transform: translateY(0); }
+      70%  { opacity: 1; }
+      100% { opacity: 0; transform: translateY(-40px); }
+    }
+
     /* ========== Chests Button ========== */
     .inventory-button {
       position: fixed;
@@ -698,6 +725,7 @@
 
     /* ========== Lobby mode: hide game UI ========== */
     body.lobby-mode .hud,
+    body.lobby-mode .chop-reward-container,
     body.lobby-mode .backpack-button,
     body.lobby-mode .inventory-button,
     body.lobby-mode .auto-chop-button,
@@ -733,6 +761,9 @@
       <span class="value" id="hud-axe">Wooden</span>
     </div>
   </div>
+
+  <!-- Chop Reward Popups -->
+  <div class="chop-reward-container" id="chop-reward-container"></div>
 
   <!-- Backpack / Inventory Button -->
   <div class="backpack-button" id="backpack-btn">
@@ -1012,6 +1043,20 @@
       chestPanel.classList.remove('visible');
     }
 
+    // ========== Chop Reward Popup ==========
+    const chopRewardContainer = document.getElementById('chop-reward-container');
+    function showChopReward(power, shards) {
+      const el = document.createElement('div');
+      el.className = 'chop-reward';
+      let html = '';
+      if (power) html += '<span class="power-part">+' + power + ' Power</span>';
+      if (shards) html += '<span class="shard-part">+' + shards + ' Shards</span>';
+      if (!html) return;
+      el.innerHTML = html;
+      chopRewardContainer.appendChild(el);
+      el.addEventListener('animationend', function() { el.remove(); });
+    }
+
     function showLootResults(results) {
       if (!Array.isArray(results)) return;
       const shardsSrc = iconUrl(SHARDS_ICON_PATH);
@@ -1144,6 +1189,8 @@
           updateHUD();
           if (chestPanel.classList.contains('visible')) renderChestGrid();
           if (inventoryPanel.classList.contains('visible')) renderAxeGrid();
+        } else if (data.type === 'chopReward') {
+          showChopReward(data.power, data.shards);
         } else if (data.type === 'lootResults') {
           showLootResults(Array.isArray(data.results) ? data.results : []);
         } else if (data.type === 'chestCollected' && Array.isArray(data.collectedChests)) {

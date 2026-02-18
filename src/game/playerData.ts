@@ -36,6 +36,7 @@ export type PlayerData = {
     treesChopped: number;
     chestsOpened: number;
     totalShardsClaimed: number;
+    shardsFromTrees: number;
   };
 };
 
@@ -53,6 +54,7 @@ export const DEFAULT_PLAYER_DATA: PlayerData = {
     treesChopped: 0,
     chestsOpened: 0,
     totalShardsClaimed: 0,
+    shardsFromTrees: 0,
   },
 };
 
@@ -189,12 +191,14 @@ export function repairPlayerData(data: PlayerData): Partial<PlayerData> {
   if (
     typeof stats.treesChopped !== "number" || !Number.isFinite(stats.treesChopped) || stats.treesChopped < 0 ||
     typeof stats.chestsOpened !== "number" || !Number.isFinite(stats.chestsOpened) || stats.chestsOpened < 0 ||
-    typeof stats.totalShardsClaimed !== "number" || !Number.isFinite(stats.totalShardsClaimed) || stats.totalShardsClaimed < 0
+    typeof stats.totalShardsClaimed !== "number" || !Number.isFinite(stats.totalShardsClaimed) || stats.totalShardsClaimed < 0 ||
+    typeof stats.shardsFromTrees !== "number" || !Number.isFinite(stats.shardsFromTrees) || stats.shardsFromTrees < 0
   ) {
     data.stats = {
       treesChopped: Math.max(0, Number(stats.treesChopped) || 0),
       chestsOpened: Math.max(0, Number(stats.chestsOpened) || 0),
       totalShardsClaimed: Math.max(0, Number(stats.totalShardsClaimed) || 0),
+      shardsFromTrees: Math.max(0, Number(stats.shardsFromTrees) || 0),
     };
     updates.stats = data.stats;
     repaired = true;

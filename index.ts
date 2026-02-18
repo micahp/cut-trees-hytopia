@@ -36,6 +36,8 @@ import {
   getAreaSpawnPosition,
   AREA_STRIDE,
   LOBBY_SPAWN,
+  LOBBY_SPAWN_ROTATION,
+  PAD_Z_CENTER,
 } from './src/systems/lobbyGameRouter';
 
 // Game config
@@ -96,6 +98,12 @@ startServer(world => {
   treeManager.setOnTreeChopped((tree, player) => {
     chestManager.trackTreeChop(player, tree.position);
     sendUIStateUpdate(player);
+    // Send floating reward popup to client
+    player.ui.sendData({
+      type: 'chopReward',
+      power: tree.powerReward,
+      shards: tree.shardReward,
+    });
   });
   chestManager.setOnChestCollected((player) => {
     sendUIStateUpdate(player);
@@ -285,9 +293,10 @@ startServer(world => {
     const playerId = player.id ?? player.username;
     lobbyPlayers.add(playerId);
 
-    // Spawn at lobby
+    // Spawn at lobby facing the teleport pad
     const playerEntity = new DefaultPlayerEntity({ player, name: player.username });
-    playerEntity.spawn(world, LOBBY_SPAWN);
+    playerEntity.spawn(world, LOBBY_SPAWN, LOBBY_SPAWN_ROTATION);
+    player.camera.lookAtPosition({ x: 0, y: LOBBY_SPAWN.y, z: PAD_Z_CENTER });
 
     // Load UI (starts in lobby mode — PLAY button visible, HUD hidden)
     player.ui.load('ui/index.html');
@@ -401,8 +410,9 @@ startServer(world => {
     PlayerManager.clearSession(player);
     lobbyPlayers.add(playerId);
     const pe = new DefaultPlayerEntity({ player, name: player.username });
-    pe.spawn(world, LOBBY_SPAWN);
-    player.camera.setAttachedToEntity(pe); // Re-attach camera to new lobby entity
+    pe.spawn(world, LOBBY_SPAWN, LOBBY_SPAWN_ROTATION);
+    player.camera.setAttachedToEntity(pe);
+    player.camera.lookAtPosition({ x: 0, y: LOBBY_SPAWN.y, z: PAD_Z_CENTER });
     player.ui.sendData({ type: 'enterLobby' });
     world.chatManager.sendPlayerMessage(player, 'Returned to lobby.', '00FF00');
   });

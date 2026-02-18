@@ -201,12 +201,8 @@ export class TreeManager {
   private chopTree(tree: TreeInstance, player: Player): void {
     tree.isChopped = true;
 
-    // Award power and shards to player
-    PlayerManager.awardPower(player, tree.powerReward);
-    if (tree.shardReward > 0) {
-      PlayerManager.awardShards(player, tree.shardReward);
-    }
-    PlayerManager.incrementTreesChopped(player);
+    // Award power, shards, and increment stats in a single save
+    PlayerManager.awardTreeChopRewards(player, tree.powerReward, tree.shardReward);
 
     // Play tree fall sound at tree position (quieter)
     new Audio({

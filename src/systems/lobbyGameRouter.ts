@@ -4,7 +4,7 @@
  * Single-world architecture:
  *   - Lobby is an elevated platform at y=50 (box-seats above the arenas).
  *   - Arena areas are at ground level (y=0), offset along the X axis.
- *   - Player spawns at one end of the lobby runway and walks to the
+ *   - Player spawns at one end of the lobby platform and walks to the
  *     teleport pad at the other end (or clicks PLAY in the UI).
  */
 
@@ -31,16 +31,19 @@ export const AREA_STRIDE = ARENA_MAP_WIDTH_X + ARENA_MAP_GAP;
 /** Lobby platform Y level (floor) */
 const LOBBY_Y = 50;
 
-/** Lobby runway dimensions (x: half-width, z: half-length) */
-const LOBBY_HALF_W = 5;   // 11 blocks wide (-5 to +5)
-const LOBBY_HALF_L = 14;  // 29 blocks long (-14 to +14)
+/** Lobby platform dimensions (x: half-width, z: half-length) */
+const LOBBY_HALF_W = 12;  // 25 blocks wide (-12 to +12)
+const LOBBY_HALF_L = 12;  // 25 blocks long (-12 to +12)
 
-/** Teleport pad: 5×5 at the +Z end of the runway */
+/** Teleport pad: 5×5 at the +Z end of the platform */
 const PAD_HALF = 2;       // -2 to +2
-const PAD_Z_CENTER = 12;  // centre of pad in Z
+export const PAD_Z_CENTER = 10;  // centre of pad in Z
 
-/** Player spawn: -Z end of the runway, 5 above floor */
-export const LOBBY_SPAWN: Vec3 = { x: 0, y: LOBBY_Y + 5, z: -(LOBBY_HALF_L - 1) };
+/** Player spawn: -Z side of the platform, 5 above floor, far enough from wall for camera */
+export const LOBBY_SPAWN: Vec3 = { x: 0, y: LOBBY_Y + 5, z: -(LOBBY_HALF_L - 5) };
+
+/** Player spawn rotation: face +Z (toward the teleport pad) */
+export const LOBBY_SPAWN_ROTATION = { x: 0, y: 1, z: 0, w: 0 };
 
 /** Teleport pad AABB (player entity centre must be inside) */
 export const LOBBY_PAD = {
@@ -66,10 +69,9 @@ export function isOnLobbyPad(position: Vec3): boolean {
  * Build the lobby platform in the world at y=50.
  *
  * Layout (top-down, +Z is "forward" toward the pad):
- *   - 11×29 grass floor
- *   - 2-high mossy-cobblestone walls on the edges
+ *   - 25×25 grass floor
+ *   - 2-high mossy-cobblestone walls on all edges (pad end open)
  *   - 5×5 glowing pad at the +Z end
- *   - Open interior edges (gaps) so players can look down at arenas
  */
 export function buildLobbyPlatform(world: World): void {
   // Register the glowing pad block type if not already present
@@ -93,18 +95,17 @@ export function buildLobbyPlatform(world: World): void {
     }
   }
 
-  // Walls (2-high on the long edges)
+  // Walls (2-high on all four edges)
   for (let z = -LOBBY_HALF_L; z <= LOBBY_HALF_L; z++) {
     for (let dy = 1; dy <= 2; dy++) {
       world.chunkLattice.setBlock({ x: -LOBBY_HALF_W, y: y + dy, z }, BLOCK_WALL);
       world.chunkLattice.setBlock({ x: LOBBY_HALF_W, y: y + dy, z }, BLOCK_WALL);
     }
   }
-
-  // Walls on the short edges (spawn end only; pad end left open for aesthetics)
   for (let x = -LOBBY_HALF_W; x <= LOBBY_HALF_W; x++) {
     for (let dy = 1; dy <= 2; dy++) {
       world.chunkLattice.setBlock({ x, y: y + dy, z: -LOBBY_HALF_L }, BLOCK_WALL);
+      world.chunkLattice.setBlock({ x, y: y + dy, z: LOBBY_HALF_L }, BLOCK_WALL);
     }
   }
 

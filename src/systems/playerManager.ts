@@ -182,7 +182,7 @@ export function awardPower(player: Player, amount: number): number {
 }
 
 /**
- * Award shards to player (from duplicate axes)
+ * Award shards to player (from tree chops or duplicate axes)
  */
 export function awardShards(player: Player, amount: number): number {
   const data = loadPlayerData(player);
@@ -212,6 +212,24 @@ export function grantAxe(player: Player, axeId: AxeId): boolean {
   });
   
   return true;
+}
+
+/**
+ * Award all tree-chop rewards in a single load/save cycle.
+ * Avoids triple read-write when awarding power, shards, and incrementing stats separately.
+ */
+export function awardTreeChopRewards(player: Player, power: number, shards: number): void {
+  const data = loadPlayerData(player);
+  savePlayerData(player, {
+    power: data.power + power,
+    shards: data.shards + shards,
+    stats: {
+      ...data.stats,
+      treesChopped: data.stats.treesChopped + 1,
+      totalShardsClaimed: data.stats.totalShardsClaimed + shards,
+      shardsFromTrees: data.stats.shardsFromTrees + shards,
+    },
+  });
 }
 
 /**

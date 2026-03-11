@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="assets-base" content="{{CDN_ASSETS_URL}}" />
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Bebas+Neue&display=swap');
+
     * {
       box-sizing: border-box;
       margin: 0;
@@ -12,58 +14,65 @@
     }
 
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: 'Rajdhani', 'Segoe UI', Arial, sans-serif;
       color: #fff;
       pointer-events: none;
-      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
     }
 
     /* ========== HUD ========== */
     .hud {
       position: fixed;
-      bottom: 20px;
-      left: 20px;
+      top: 16px;
+      left: 16px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 4px;
       pointer-events: none;
     }
 
     .hud-stat {
-      background: rgba(0, 0, 0, 0.75);
-      padding: 8px 16px;
-      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.65);
+      padding: 6px 14px 6px 10px;
+      border-radius: 4px;
       display: flex;
       align-items: center;
-      gap: 10px;
-      font-size: 14px;
+      gap: 8px;
+      font-size: 15px;
       font-weight: 600;
-      backdrop-filter: blur(6px);
-      border: 2px solid rgba(255, 255, 255, 0.85);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(8px);
+      border-left: 3px solid rgba(255, 255, 255, 0.25);
+      letter-spacing: 0.5px;
     }
 
+    .hud-stat.power  { border-left-color: #b8ff2e; }
+    .hud-stat.shards { border-left-color: #4dd0ff; }
+    .hud-stat.axe    { border-left-color: #ff7043; }
+
     .hud-stat .label {
-      color: rgba(255, 255, 255, 0.9);
-      font-weight: 500;
+      color: rgba(255, 255, 255, 0.55);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      min-width: 44px;
     }
 
     .hud-stat .value {
       font-weight: 700;
-      color: #b8ff2e;
-      text-shadow: 0 0 8px rgba(184, 255, 46, 0.5);
+      font-size: 17px;
     }
 
-    .hud-stat.power .value { color: #b8ff2e; text-shadow: 0 0 8px rgba(184, 255, 46, 0.5); }
-    .hud-stat.shards .value { color: #4dd0ff; text-shadow: 0 0 8px rgba(77, 208, 255, 0.5); }
-    .hud-stat.axe .value { color: #ff7043; text-shadow: 0 0 6px rgba(255, 112, 67, 0.4); }
+    .hud-stat.power  .value { color: #c8ff4e; text-shadow: 0 0 10px rgba(184, 255, 46, 0.6); }
+    .hud-stat.shards .value { color: #5de0ff; text-shadow: 0 0 10px rgba(77, 208, 255, 0.6); }
+    .hud-stat.axe    .value { color: #ff8a65; text-shadow: 0 0 8px rgba(255, 112, 67, 0.5); }
 
     .hud-stat .icon-img {
-      width: 26px;
-      height: 26px;
+      width: 22px;
+      height: 22px;
       object-fit: contain;
       flex-shrink: 0;
-      filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5));
+      filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
     }
 
     /* ========== Chop Reward Popup ========== */
@@ -93,93 +102,71 @@
       100% { opacity: 0; transform: translateY(-40px); }
     }
 
-    /* ========== Chests Button ========== */
-    .inventory-button {
+    /* ========== Game Action Buttons (right side) ========== */
+    .inventory-button,
+    .auto-chop-button,
+    .backpack-button {
       position: fixed;
-      bottom: 100px;
-      right: 20px;
-      background: rgba(0, 0, 0, 0.78);
-      border: 2px solid rgba(255, 255, 255, 0.9);
-      border-radius: 14px;
-      padding: 12px 18px;
+      right: 14px;
+      background: rgba(0, 0, 0, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 4px;
+      padding: 10px 16px;
       cursor: pointer;
       pointer-events: auto;
       display: flex;
       align-items: center;
       gap: 8px;
-      transition: all 0.2s;
+      transition: all 0.15s ease;
       font-weight: 600;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+      font-size: 14px;
+      letter-spacing: 0.5px;
+      backdrop-filter: blur(8px);
     }
 
-    .inventory-button:hover {
-      background: rgba(0, 0, 0, 0.9);
-      border-color: #ffd54f;
-      transform: scale(1.03);
-      box-shadow: 0 0 12px rgba(255, 213, 79, 0.3);
-    }
+    .inventory-button  { bottom: 94px;  border-left: 2px solid #ffd54f; }
+    .auto-chop-button  { bottom: 150px; border-left: 2px solid rgba(184, 255, 46, 0.6); }
+    .backpack-button   { bottom: 38px;  border-left: 2px solid #4dd0ff; }
+
+    .inventory-button:hover  { background: rgba(255, 213, 79, 0.12);  border-color: #ffd54f; transform: translateX(-2px); }
+    .backpack-button:hover   { background: rgba(77, 208, 255, 0.12);  border-color: #4dd0ff; transform: translateX(-2px); }
+    .auto-chop-button:hover  { background: rgba(184, 255, 46, 0.12);  border-color: rgba(184,255,46,0.8); transform: translateX(-2px); }
 
     .inventory-button .icon-img,
     .auto-chop-button .icon-img,
     .backpack-button .icon-img {
-      width: 24px;
-      height: 24px;
+      width: 22px;
+      height: 22px;
       object-fit: contain;
-      filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5));
+      filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
     }
 
     .inventory-button .count {
       background: #ffd54f;
       color: #1a1a1a;
       font-weight: 700;
-      padding: 2px 8px;
-      border-radius: 10px;
-      font-size: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.8);
-    }
-
-    /* ========== Auto-Chop Button ========== */
-    .auto-chop-button {
-      position: fixed;
-      bottom: 160px;
-      right: 20px;
-      background: rgba(0, 0, 0, 0.78);
-      border: 2px solid rgba(255, 255, 255, 0.9);
-      border-radius: 14px;
-      padding: 12px 18px;
-      cursor: pointer;
-      pointer-events: auto;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      transition: all 0.2s;
-      user-select: none;
-      font-weight: 600;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
-    }
-
-    .auto-chop-button:hover {
-      background: rgba(0, 0, 0, 0.9);
-      border-color: rgba(255, 255, 255, 1);
-      transform: scale(1.03);
+      padding: 1px 7px;
+      border-radius: 3px;
+      font-size: 11px;
     }
 
     .auto-chop-button.active {
-      background: rgba(184, 255, 46, 0.35);
-      border: 2px solid rgba(255, 255, 255, 0.95);
-      box-shadow: 0 0 14px rgba(184, 255, 46, 0.5), 0 2px 10px rgba(0, 0, 0, 0.3);
+      background: rgba(184, 255, 46, 0.18);
+      border-left-color: #c8ff4e;
+      box-shadow: 0 0 16px rgba(184, 255, 46, 0.25);
     }
 
     .auto-chop-button .status {
       font-size: 10px;
       text-transform: uppercase;
       font-weight: 700;
-      opacity: 0.9;
+      letter-spacing: 1px;
+      color: rgba(255, 255, 255, 0.5);
     }
 
     .auto-chop-button.active .status {
-      color: #b8ff2e;
-      text-shadow: 0 0 6px rgba(184, 255, 46, 0.6);
+      color: #c8ff4e;
+      text-shadow: 0 0 8px rgba(184, 255, 46, 0.7);
     }
 
     /* ========== Chest Panel ========== */
@@ -655,72 +642,150 @@
       text-shadow: 0 0 6px rgba(255, 213, 79, 0.3);
     }
 
-    /* Backpack button */
-    .backpack-button {
+    /* Backpack button — layout defined in Game Action Buttons above */
+
+    /* ========== Lobby Screen ========== */
+    .lobby-screen {
       position: fixed;
-      bottom: 40px;
-      right: 20px;
-      background: rgba(0, 0, 0, 0.78);
-      border: 2px solid rgba(255, 255, 255, 0.9);
-      border-radius: 14px;
-      padding: 12px 18px;
-      cursor: pointer;
-      pointer-events: auto;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      pointer-events: none;
+      z-index: 900;
+      /* Dark vignette top & bottom, clear in the center so the 3D world shows */
+      background:
+        linear-gradient(to bottom,  rgba(0,0,0,0.88) 0%,  rgba(0,0,0,0.0) 38%),
+        linear-gradient(to top,     rgba(0,0,0,0.88) 0%,  rgba(0,0,0,0.0) 44%);
+    }
+
+    .lobby-header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 48px;
+      gap: 6px;
+    }
+
+    .lobby-game-title {
+      font-family: 'Bebas Neue', 'Impact', sans-serif;
+      font-size: 88px;
+      letter-spacing: 10px;
+      line-height: 1;
+      color: #fff;
+      text-shadow:
+        0 0 60px rgba(184, 255, 46, 0.45),
+        0 0 20px rgba(184, 255, 46, 0.3),
+        0 4px 12px rgba(0,0,0,0.9);
+      /* Green gradient fill */
+      background: linear-gradient(180deg, #ffffff 0%, #c8ff4e 60%, #7ec800 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .lobby-tagline {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.55);
+      text-shadow: none;
+      -webkit-text-fill-color: unset;
+    }
+
+    /* Decorative axe icon between title and tagline */
+    .lobby-icon-row {
       display: flex;
       align-items: center;
-      gap: 8px;
-      transition: all 0.2s;
-      font-weight: 600;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+      gap: 14px;
+      margin: 2px 0;
+    }
+    .lobby-icon-row::before,
+    .lobby-icon-row::after {
+      content: '';
+      display: block;
+      width: 80px;
+      height: 1px;
+      background: linear-gradient(to right, transparent, rgba(184,255,46,0.5));
+    }
+    .lobby-icon-row::after {
+      background: linear-gradient(to left, transparent, rgba(184,255,46,0.5));
+    }
+    .lobby-axe-glyph {
+      font-size: 24px;
+      line-height: 1;
+      filter: drop-shadow(0 0 8px rgba(184,255,46,0.7));
     }
 
-    .backpack-button:hover {
-      background: rgba(0, 0, 0, 0.9);
-      border-color: #4dd0ff;
-      transform: scale(1.03);
-      box-shadow: 0 0 12px rgba(77, 208, 255, 0.3);
+    .lobby-footer {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-bottom: 52px;
+      gap: 14px;
+      pointer-events: auto;
     }
 
-    /* ========== Lobby PLAY Button ========== */
     .lobby-play-btn {
-      position: fixed;
-      bottom: 60px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: linear-gradient(180deg, #66bb6a, #43a047);
-      border: 3px solid rgba(255, 255, 255, 0.95);
-      color: #fff;
-      font-size: 28px;
-      font-weight: 800;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      padding: 18px 64px;
-      border-radius: 18px;
+      position: relative;
+      background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%);
+      border: 2px solid rgba(184, 255, 46, 0.8);
+      color: #c8ff4e;
+      font-family: 'Bebas Neue', 'Impact', sans-serif;
+      font-size: 36px;
+      letter-spacing: 8px;
+      padding: 16px 72px 14px 80px;
+      border-radius: 6px;
       cursor: pointer;
       pointer-events: auto;
-      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-      box-shadow: 0 6px 24px rgba(76, 175, 80, 0.5), 0 0 40px rgba(76, 175, 80, 0.25);
-      transition: all 0.2s;
-      z-index: 900;
-      animation: playPulse 2s ease-in-out infinite;
+      text-shadow: 0 0 20px rgba(184, 255, 46, 0.6);
+      box-shadow:
+        0 0 30px rgba(184, 255, 46, 0.2),
+        0 0 60px rgba(184, 255, 46, 0.08),
+        inset 0 1px 0 rgba(255,255,255,0.06);
+      transition: all 0.15s ease;
+      animation: playPulse 2.5s ease-in-out infinite;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .lobby-play-btn .play-arrow {
+      font-size: 26px;
+      line-height: 1;
+      margin-left: -10px;
+      color: rgba(184, 255, 46, 0.9);
     }
 
     .lobby-play-btn:hover {
-      transform: translateX(-50%) scale(1.06);
-      box-shadow: 0 8px 32px rgba(76, 175, 80, 0.7), 0 0 60px rgba(76, 175, 80, 0.35);
+      border-color: #c8ff4e;
+      box-shadow:
+        0 0 50px rgba(184, 255, 46, 0.4),
+        0 0 80px rgba(184, 255, 46, 0.15),
+        inset 0 1px 0 rgba(255,255,255,0.1);
+      transform: translateY(-2px);
+      color: #deff7a;
     }
 
     .lobby-play-btn:active {
-      transform: translateX(-50%) scale(0.97);
-    }
-
-    .lobby-play-btn.hidden {
-      display: none;
+      transform: translateY(1px);
+      box-shadow: 0 0 20px rgba(184, 255, 46, 0.2);
     }
 
     @keyframes playPulse {
-      0%, 100% { box-shadow: 0 6px 24px rgba(76, 175, 80, 0.5), 0 0 40px rgba(76, 175, 80, 0.25); }
-      50% { box-shadow: 0 6px 32px rgba(76, 175, 80, 0.7), 0 0 60px rgba(76, 175, 80, 0.4); }
+      0%, 100% { box-shadow: 0 0 30px rgba(184,255,46,0.2), 0 0 60px rgba(184,255,46,0.08), inset 0 1px 0 rgba(255,255,255,0.06); }
+      50%       { box-shadow: 0 0 50px rgba(184,255,46,0.35), 0 0 80px rgba(184,255,46,0.15), inset 0 1px 0 rgba(255,255,255,0.06); }
+    }
+
+    .lobby-hint {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.35);
+      text-align: center;
+      text-shadow: none;
     }
 
     /* ========== Lobby mode: hide game UI ========== */
@@ -734,14 +799,30 @@
     }
 
     /* ========== Game mode: hide lobby UI ========== */
-    body.game-mode .lobby-play-btn {
+    body.game-mode .lobby-screen {
       display: none !important;
     }
   </style>
 </head>
 <body class="lobby-mode">
-  <!-- Lobby PLAY Button -->
-  <button class="lobby-play-btn" id="lobby-play-btn">PLAY</button>
+  <!-- ====== LOBBY SCREEN ====== -->
+  <div class="lobby-screen" id="lobby-screen">
+    <div class="lobby-header">
+      <h1 class="lobby-game-title">CUT TREES</h1>
+      <div class="lobby-icon-row">
+        <span class="lobby-axe-glyph">🪓</span>
+      </div>
+      <p class="lobby-tagline">Chop · Collect · Dominate</p>
+    </div>
+
+    <div class="lobby-footer">
+      <button class="lobby-play-btn" id="lobby-play-btn">
+        <span class="play-arrow">▶</span>
+        <span>PLAY</span>
+      </button>
+      <p class="lobby-hint">Step on the glowing pad · or click play</p>
+    </div>
+  </div>
 
   <!-- HUD -->
   <div class="hud">
@@ -878,6 +959,7 @@
     // ========== Lobby / Game Mode ==========
     let lobbyMode = true;
     const lobbyPlayBtn = document.getElementById('lobby-play-btn');
+    const lobbyScreen  = document.getElementById('lobby-screen');
 
     lobbyPlayBtn.addEventListener('click', () => {
       hytopia.sendData({ type: 'play' });

@@ -3,7 +3,7 @@
  * Handles tree spawning, HP tracking, damage, debris, and respawning.
  */
 
-import { Entity, ColliderShape, RigidBodyType, Audio } from 'hytopia';
+import { Entity, RigidBodyType, Audio } from 'hytopia';
 import type { TreeId, TreeDef, DebrisDef } from '../game/trees';
 import { TREES, applyWorldMultipliers, getRandomDebris } from '../game/trees';
 import { CHEST_CONSTANTS } from '../game/chests';
@@ -126,11 +126,12 @@ export class TreeManager {
     const { maxHp, powerReward, shardReward } = applyWorldMultipliers(def, this.worldType);
 
     // Create tree entity
+    // Note: ColliderShape.CYLINDER is not yet supported by optionsFromModelUri;
+    // omitting modelPreferredShape lets the SDK use its default generic shape silently.
     const entity = new Entity({
       name: `Tree-${point.id}`,
       modelUri: def.modelUri,
       modelScale: 1,
-      modelPreferredShape: ColliderShape.CYLINDER,
       rigidBodyOptions: {
         type: RigidBodyType.FIXED, // Trees don't move
       },
@@ -217,9 +218,16 @@ export class TreeManager {
       this.onTreeChopped(tree, player);
     }
 
-    // Despawn tree immediately and spawn debris (no fall animation)
+    // Hide the tree immediately then defer the actual despawn by 150ms.
+    // The SDK's input handler can call entity.interact() on a just-chopped tree
+    // if the physics body is still present when the next input packet arrives.
+    // Zeroing opacity gives instant visual feedback while the physics world cleans up.
     if (tree.entity?.isSpawned) {
-      tree.entity.despawn();
+      tree.entity.setOpacity(0);
+      const entityToDespawn = tree.entity;
+      setTimeout(() => {
+        if (entityToDespawn.isSpawned) entityToDespawn.despawn();
+      }, 150);
     }
     tree.entity = null;
     this.spawnDebris(tree);

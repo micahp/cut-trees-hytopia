@@ -6,13 +6,14 @@
 import { Entity, RigidBodyType, Audio } from 'hytopia';
 import type { TreeId, TreeDef, DebrisDef } from '../game/trees';
 import { TREES, applyWorldMultipliers, getRandomDebris } from '../game/trees';
-import { CHEST_CONSTANTS } from '../game/chests';
 import type { WorldLoopTimerManager } from './timers';
 import * as PlayerManager from './playerManager';
 
 type World = any;
 type Player = any;
 type Vec3 = { x: number; y: number; z: number };
+
+const TREE_BUCKET_SIZE = 16;
 
 /** Runtime state for a spawned tree */
 interface TreeInstance {
@@ -27,6 +28,7 @@ interface TreeInstance {
   position: Vec3;
   groundY: number;
   isChopped: boolean;
+  bucketKey?: string;
 }
 
 /** Tree spawn point configuration */
@@ -49,6 +51,7 @@ export class TreeManager {
   private spawnPoints: TreeSpawnPoint[] = [];
   private worldType: string = 'forest';
   private onTreeChopped?: TreeChoppedCallback;
+  private treeBuckets = new Map<string, Set<string>>();
 
   constructor(world: World, timers: WorldLoopTimerManager) {
     this.world = world;
@@ -153,7 +156,10 @@ export class TreeManager {
     };
 
     // Store reference before spawning
+    const bucketKey = this.getBucketKey(instance.position);
+    instance.bucketKey = bucketKey;
     this.trees.set(point.id, instance);
+    this.addTreeToBucket(point.id, bucketKey);
 
     // Store tree ID in entity for lookup
     (entity as any).__treeId = point.id;
@@ -316,6 +322,7 @@ export class TreeManager {
     const point = this.spawnPoints.find(p => p.id === treeId);
     if (!point) return;
 
+    this.removeTreeFromBucket(treeId, tree.bucketKey);
     // Remove old instance
     this.trees.delete(treeId);
 
@@ -351,17 +358,27 @@ export class TreeManager {
   getTreesInRadius(center: Vec3, radius: number): TreeInstance[] {
     const radiusSq = radius * radius;
     const result: TreeInstance[] = [];
+    const visited = new Set<string>();
+    const bucketKeys = this.getBucketKeysForRadius(center, radius);
 
-    for (const tree of this.trees.values()) {
-      if (tree.isChopped) continue;
+    for (const key of bucketKeys) {
+      const bucket = this.treeBuckets.get(key);
+      if (!bucket) continue;
 
-      const dx = tree.position.x - center.x;
-      const dz = tree.position.z - center.z;
-      // Use 2D distance (ignore Y) for AoE
-      const distSq = dx * dx + dz * dz;
+      for (const treeId of bucket) {
+        if (visited.has(treeId)) continue;
+        visited.add(treeId);
 
-      if (distSq <= radiusSq) {
-        result.push(tree);
+        const tree = this.trees.get(treeId);
+        if (!tree || tree.isChopped) continue;
+
+        const dx = tree.position.x - center.x;
+        const dz = tree.position.z - center.z;
+        const distSq = dx * dx + dz * dz;
+
+        if (distSq <= radiusSq) {
+          result.push(tree);
+        }
       }
     }
 
@@ -381,5 +398,47 @@ export class TreeManager {
       }
     }
     this.trees.clear();
+    this.treeBuckets.clear();
+  }
+
+  private getBucketKey(position: Vec3): string {
+    const xIndex = Math.floor(position.x / TREE_BUCKET_SIZE);
+    const zIndex = Math.floor(position.z / TREE_BUCKET_SIZE);
+    return `${xIndex}|${zIndex}`;
+  }
+
+  private getBucketKeysForRadius(center: Vec3, radius: number): string[] {
+    const minX = Math.floor((center.x - radius) / TREE_BUCKET_SIZE);
+    const maxX = Math.floor((center.x + radius) / TREE_BUCKET_SIZE);
+    const minZ = Math.floor((center.z - radius) / TREE_BUCKET_SIZE);
+    const maxZ = Math.floor((center.z + radius) / TREE_BUCKET_SIZE);
+    const keys: string[] = [];
+
+    for (let x = minX; x <= maxX; x++) {
+      for (let z = minZ; z <= maxZ; z++) {
+        keys.push(`${x}|${z}`);
+      }
+    }
+
+    return keys;
+  }
+
+  private addTreeToBucket(treeId: string, bucketKey: string): void {
+    if (!this.treeBuckets.has(bucketKey)) {
+      this.treeBuckets.set(bucketKey, new Set());
+    }
+    this.treeBuckets.get(bucketKey)!.add(treeId);
+  }
+
+  private removeTreeFromBucket(treeId: string, bucketKey?: string): void {
+    const key = bucketKey ?? this.trees.get(treeId)?.bucketKey;
+    if (!key) return;
+    const bucket = this.treeBuckets.get(key);
+    if (!bucket) return;
+
+    bucket.delete(treeId);
+    if (bucket.size === 0) {
+      this.treeBuckets.delete(key);
+    }
   }
 }

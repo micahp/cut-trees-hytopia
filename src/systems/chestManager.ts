@@ -15,6 +15,8 @@ type World = any;
 type Player = any;
 type Vec3 = { x: number; y: number; z: number };
 
+const CHEST_BUCKET_SIZE = 16;
+
 /** Runtime state for a spawned chest */
 interface ChestInstance {
   id: string;
@@ -53,9 +55,12 @@ export class ChestManager {
   private timers: WorldLoopTimerManager;
   private chests = new Map<string, ChestInstance>();
   private spawnPoints: ChestSpawnPoint[] = [];
+  private spawnPointMap = new Map<string, ChestSpawnPoint>();
   
   /** Track trees chopped near each spawn point, per player */
   private treeChopsNearSpawnPoint = new Map<string, Map<string, number>>();
+  private chestBuckets = new Map<string, Set<string>>();
+  private maxNearbyRadius = CHEST_CONSTANTS.NEARBY_TREES_RADIUS;
   
   /** Callback for chest collection events */
   private onChestCollected?: ChestCollectedCallback;
@@ -78,6 +83,13 @@ export class ChestManager {
   addSpawnPoint(point: ChestSpawnPoint): void {
     this.spawnPoints.push(point);
     this.treeChopsNearSpawnPoint.set(point.id, new Map());
+    this.spawnPointMap.set(point.id, point);
+    const bucketKey = this.getBucketKey(point.position);
+    this.addChestToBucket(point.id, bucketKey);
+    const nearbyRadius = point.nearbyRadius ?? CHEST_CONSTANTS.NEARBY_TREES_RADIUS;
+    if (nearbyRadius > this.maxNearbyRadius) {
+      this.maxNearbyRadius = nearbyRadius;
+    }
   }
 
   /**
@@ -179,7 +191,7 @@ export class ChestManager {
     const nearbyTrees = this.getPlayerTreeChops(player, chestId);
 
     // Get spawn point for authored unlock cost (if any)
-    const spawnPoint = this.spawnPoints.find(p => p.id === chestId);
+    const spawnPoint = this.spawnPointMap.get(chestId);
     const unlockCost = spawnPoint?.unlockCostTrees ?? chest.definition.unlockCost;
 
     // Check if player can unlock (use authored unlock cost if available)
@@ -277,7 +289,7 @@ export class ChestManager {
    * Respawn a chest after its timer
    */
   private respawnChest(chestId: string): void {
-    const point = this.spawnPoints.find(p => p.id === chestId);
+    const point = this.spawnPointMap.get(chestId);
     if (!point) return;
 
     // Remove old instance
@@ -293,23 +305,35 @@ export class ChestManager {
   trackTreeChop(player: Player, treePosition: Vec3): void {
     const playerId = player.id ?? player.username;
 
-    for (const point of this.spawnPoints) {
-      const chest = this.chests.get(point.id);
-      if (!chest || chest.isCollected) continue;
+    const bucketKeys = this.getBucketKeysForRadius(treePosition, this.maxNearbyRadius);
+    const visited = new Set<string>();
 
-      // Use authored radius if available, otherwise default
-      const radius = point.nearbyRadius ?? CHEST_CONSTANTS.NEARBY_TREES_RADIUS;
-      const radiusSq = radius * radius;
+    for (const key of bucketKeys) {
+      const bucket = this.chestBuckets.get(key);
+      if (!bucket) continue;
 
-      const dx = chest.position.x - treePosition.x;
-      const dz = chest.position.z - treePosition.z;
-      const distSq = dx * dx + dz * dz;
+      for (const spawnPointId of bucket) {
+        if (visited.has(spawnPointId)) continue;
+        visited.add(spawnPointId);
 
-      if (distSq <= radiusSq) {
-        const playerChops = this.treeChopsNearSpawnPoint.get(point.id);
-        if (playerChops) {
-          const current = playerChops.get(playerId) ?? 0;
-          playerChops.set(playerId, current + 1);
+        const chest = this.chests.get(spawnPointId);
+        if (!chest || chest.isCollected) continue;
+
+        const spawnPoint = this.spawnPointMap.get(spawnPointId);
+        if (!spawnPoint) continue;
+
+        const radius = spawnPoint.nearbyRadius ?? CHEST_CONSTANTS.NEARBY_TREES_RADIUS;
+        const radiusSq = radius * radius;
+        const dx = chest.position.x - treePosition.x;
+        const dz = chest.position.z - treePosition.z;
+        const distSq = dx * dx + dz * dz;
+
+        if (distSq <= radiusSq) {
+          const playerChops = this.treeChopsNearSpawnPoint.get(spawnPointId);
+          if (playerChops) {
+            const current = playerChops.get(playerId) ?? 0;
+            playerChops.set(playerId, current + 1);
+          }
         }
       }
     }
@@ -383,5 +407,37 @@ export class ChestManager {
     }
     this.chests.clear();
     this.treeChopsNearSpawnPoint.clear();
+    this.spawnPointMap.clear();
+    this.chestBuckets.clear();
+    this.maxNearbyRadius = CHEST_CONSTANTS.NEARBY_TREES_RADIUS;
+  }
+
+  private getBucketKey(position: Vec3): string {
+    const xIndex = Math.floor(position.x / CHEST_BUCKET_SIZE);
+    const zIndex = Math.floor(position.z / CHEST_BUCKET_SIZE);
+    return `${xIndex}|${zIndex}`;
+  }
+
+  private getBucketKeysForRadius(center: Vec3, radius: number): string[] {
+    const minX = Math.floor((center.x - radius) / CHEST_BUCKET_SIZE);
+    const maxX = Math.floor((center.x + radius) / CHEST_BUCKET_SIZE);
+    const minZ = Math.floor((center.z - radius) / CHEST_BUCKET_SIZE);
+    const maxZ = Math.floor((center.z + radius) / CHEST_BUCKET_SIZE);
+    const keys: string[] = [];
+
+    for (let x = minX; x <= maxX; x++) {
+      for (let z = minZ; z <= maxZ; z++) {
+        keys.push(`${x}|${z}`);
+      }
+    }
+
+    return keys;
+  }
+
+  private addChestToBucket(spawnPointId: string, bucketKey: string): void {
+    if (!this.chestBuckets.has(bucketKey)) {
+      this.chestBuckets.set(bucketKey, new Set());
+    }
+    this.chestBuckets.get(bucketKey)!.add(spawnPointId);
   }
 }

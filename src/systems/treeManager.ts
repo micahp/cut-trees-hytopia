@@ -49,6 +49,7 @@ export class TreeManager {
   private timers: WorldLoopTimerManager;
   private trees = new Map<string, TreeInstance>();
   private spawnPoints: TreeSpawnPoint[] = [];
+  private spawnPointMap = new Map<string, TreeSpawnPoint>();
   private worldType: string = 'forest';
   private onTreeChopped?: TreeChoppedCallback;
   private treeBuckets = new Map<string, Set<string>>();
@@ -77,6 +78,7 @@ export class TreeManager {
    */
   addSpawnPoint(point: TreeSpawnPoint): void {
     this.spawnPoints.push(point);
+    this.spawnPointMap.set(point.id, point);
   }
 
   /**
@@ -319,7 +321,7 @@ export class TreeManager {
     tree.debrisEntity = null;
 
     // Find the spawn point
-    const point = this.spawnPoints.find(p => p.id === treeId);
+    const point = this.spawnPointMap.get(treeId);
     if (!point) return;
 
     this.removeTreeFromBucket(treeId, tree.bucketKey);
@@ -398,6 +400,7 @@ export class TreeManager {
       }
     }
     this.trees.clear();
+    this.spawnPointMap.clear();
     this.treeBuckets.clear();
   }
 

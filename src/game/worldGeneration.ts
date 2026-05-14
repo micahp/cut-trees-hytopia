@@ -66,10 +66,10 @@ interface TreePlacementConfig {
 }
 
 const DEFAULT_CONFIG: TreePlacementConfig = {
-  outerRingSpacing: 2,
-  clusterSpacing: 2,
-  outerRingDistance: 8,
-  chestTreeBuffer: 1.5, // 50% buffer for trees around chests
+  outerRingSpacing: 3,
+  clusterSpacing: 3,
+  outerRingDistance: 4,
+  chestTreeBuffer: 1.2, // 20% buffer for trees around chests
 };
 
 /** Tree counts per chest tier (with buffer) */

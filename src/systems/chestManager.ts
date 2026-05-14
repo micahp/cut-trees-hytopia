@@ -349,23 +349,36 @@ export class ChestManager {
 
   /**
    * Try to collect the nearest chest within interaction radius of the player's position.
-   * Used as a backup when the player's raycast doesn't directly hit a chest entity.
+   * Uses spatial bucket indexing (O(buckets) instead of O(all chests)).
    */
   tryCollectNearby(player: Player, playerPosition: Vec3): void {
-    const radiusSq = CHEST_CONSTANTS.INTERACTION_RADIUS * CHEST_CONSTANTS.INTERACTION_RADIUS;
+    const radius = CHEST_CONSTANTS.INTERACTION_RADIUS;
+    const radiusSq = radius * radius;
+    const bucketKeys = this.getBucketKeysForRadius(playerPosition, radius);
+    const visited = new Set<string>();
+
     let nearest: ChestInstance | null = null;
     let nearestDistSq = Infinity;
 
-    for (const chest of this.chests.values()) {
-      if (chest.isCollected) continue;
+    for (const key of bucketKeys) {
+      const bucket = this.chestBuckets.get(key);
+      if (!bucket) continue;
 
-      const dx = chest.position.x - playerPosition.x;
-      const dz = chest.position.z - playerPosition.z;
-      const distSq = dx * dx + dz * dz;
+      for (const spawnPointId of bucket) {
+        if (visited.has(spawnPointId)) continue;
+        visited.add(spawnPointId);
 
-      if (distSq <= radiusSq && distSq < nearestDistSq) {
-        nearest = chest;
-        nearestDistSq = distSq;
+        const chest = this.chests.get(spawnPointId);
+        if (!chest || chest.isCollected) continue;
+
+        const dx = chest.position.x - playerPosition.x;
+        const dz = chest.position.z - playerPosition.z;
+        const distSq = dx * dx + dz * dz;
+
+        if (distSq <= radiusSq && distSq < nearestDistSq) {
+          nearest = chest;
+          nearestDistSq = distSq;
+        }
       }
     }
 

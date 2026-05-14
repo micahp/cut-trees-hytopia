@@ -83,7 +83,9 @@ export class TreeManager {
    * Add multiple spawn points
    */
   addSpawnPoints(points: TreeSpawnPoint[]): void {
-    this.spawnPoints.push(...points);
+    for (const point of points) {
+      this.addSpawnPoint(point);
+    }
   }
 
   /**

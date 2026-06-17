@@ -51,7 +51,8 @@ export class TreeManager {
   private spawnPoints: TreeSpawnPoint[] = [];
   private worldType: string = 'forest';
   private onTreeChopped?: TreeChoppedCallback;
-  private treeBuckets = new Map<string, Set<string>>();
+  private treeBuckets = new Map<string, Set<string>>()
+  private spawnPointMap = new Map<string, TreeSpawnPoint>(); // Corrected declaration
 
   constructor(world: World, timers: WorldLoopTimerManager) {
     this.world = world;
@@ -77,6 +78,9 @@ export class TreeManager {
    */
   addSpawnPoint(point: TreeSpawnPoint): void {
     this.spawnPoints.push(point);
+    this.spawnPointMap.set(point.id, point); // Add to map
+    const bucketKey = this.getBucketKey(point.position);
+    this.addTreeToBucket(point.id, bucketKey); // Add to bucket
   }
 
   /**
@@ -320,8 +324,8 @@ export class TreeManager {
     }
     tree.debrisEntity = null;
 
-    // Find the spawn point
-    const point = this.spawnPoints.find(p => p.id === treeId);
+    // Find the spawn point using the new spawnPointMap
+    const point = this.spawnPointMap.get(treeId);
     if (!point) return;
 
     this.removeTreeFromBucket(treeId, tree.bucketKey);
@@ -401,6 +405,7 @@ export class TreeManager {
     }
     this.trees.clear();
     this.treeBuckets.clear();
+    this.spawnPointMap.clear(); // Clear spawnPointMap on cleanup
   }
 
   private getBucketKey(position: Vec3): string {
